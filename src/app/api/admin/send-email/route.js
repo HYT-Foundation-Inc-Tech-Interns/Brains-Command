@@ -21,6 +21,7 @@ export async function POST(request) {
     const mailOptions = {
       from: '"Brains Central Command" <hello@brains.asia>',
       to: to,
+      replyTo: 'replies@inbound.brains.asia',
       subject: subject,
       html: `
         <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-w-2xl; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
