@@ -120,7 +120,8 @@ export default function AdminDashboard() {
   
   const [viewSubModal, setViewSubModal] = useState(null);
   
-  // --- EMAIL REPLY MODAL STATE ---
+  // --- INQUIRY MODALS STATE ---
+  const [viewInquiryModal, setViewInquiryModal] = useState(null);
   const [emailReplyModal, setEmailReplyModal] = useState(null);
 
   const [activeTab, setActiveTab] = useState('inquiries'); 
@@ -282,12 +283,11 @@ export default function AdminDashboard() {
     const fileInput = e.target.attachment.files[0];
     let attachmentData = null;
 
-    // Convert file to Base64 to send safely via JSON to Next.js API
     if (fileInput) {
       const toBase64 = file => new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result.split(',')[1]); // Drop the data:mime prefix
+        reader.onload = () => resolve(reader.result.split(',')[1]); 
         reader.onerror = error => reject(error);
       });
       
@@ -314,7 +314,6 @@ export default function AdminDashboard() {
 
       if (!res.ok) throw new Error('Failed to send email');
       
-      // Auto mark as contacted after sending email
       toggleInquiryStatus(emailReplyModal.id, 'Pending');
       setEmailReplyModal(null);
       alert('Email sent successfully!');
@@ -403,6 +402,67 @@ export default function AdminDashboard() {
     <div className="relative min-h-screen text-gray-100 font-sans selection:bg-fuchsia-500/30 selection:text-fuchsia-100 py-6 md:py-12">
       <ParticleBackground />
 
+      {/* --- NEW: VIEW INQUIRY MODAL (Inbox Reader) --- */}
+      {viewInquiryModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-[#090b14]/80 backdrop-blur-sm cursor-pointer" onClick={() => setViewInquiryModal(null)}></div>
+          <div className="relative w-full max-w-2xl bg-[#13172e] border border-emerald-500/50 rounded-2xl p-6 md:p-8 z-10 shadow-[0_0_40px_rgba(16,185,129,0.25)] flex flex-col max-h-[90vh]">
+            
+            <div className="flex justify-between items-start mb-6 border-b border-indigo-800/50 pb-4">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <span className="text-2xl">📥</span> Incoming Request
+                </h3>
+                <p className="text-xs text-indigo-300/80 mt-1">Sent: {new Date(viewInquiryModal.created_at || viewInquiryModal.date).toLocaleString()}</p>
+              </div>
+              <button type="button" onClick={() => setViewInquiryModal(null)} className="text-indigo-400 hover:text-white transition-colors">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="overflow-y-auto pr-2 space-y-4 text-sm flex-1 connector-scrollbar">
+              <div className="bg-[#060810]/50 border border-indigo-800/50 rounded-xl p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block mb-1">From</span>
+                    <div className="text-white font-medium">{viewInquiryModal.name}</div>
+                    <div className="text-indigo-300 text-xs">{viewInquiryModal.email}</div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block mb-1">Company / Type</span>
+                    <div className="text-white font-medium">{viewInquiryModal.company || 'N/A'}</div>
+                    <div className="text-indigo-300 text-xs">{viewInquiryModal.type}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-[#090b14]/50 border border-indigo-800/50 rounded-xl p-4">
+                 <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block mb-2">Subject</span>
+                 <div className="text-base font-bold text-indigo-100">{viewInquiryModal.subject}</div>
+              </div>
+
+              <div className="bg-[#090b14]/50 border border-indigo-800/50 rounded-xl p-4 min-h-[150px]">
+                 <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block mb-2">Message Details</span>
+                 <div className="text-indigo-200 whitespace-pre-wrap leading-relaxed">{viewInquiryModal.details || <span className="italic opacity-50">No additional details provided.</span>}</div>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-indigo-800/50 flex gap-3 justify-end">
+               <button type="button" onClick={() => setViewInquiryModal(null)} className="px-5 py-2.5 text-sm font-bold text-indigo-300 hover:text-white transition-colors">Close</button>
+               <button 
+                 onClick={() => {
+                   setEmailReplyModal(viewInquiryModal);
+                   setViewInquiryModal(null);
+                 }} 
+                 className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-2.5 rounded-xl text-sm font-bold shadow-lg hover:shadow-indigo-500/25 active:scale-95 transition-all flex items-center gap-2"
+               >
+                 ✉️ Reply via Email
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --- EMAIL REPLY MODAL --- */}
       {emailReplyModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -412,7 +472,7 @@ export default function AdminDashboard() {
             <div className="flex justify-between items-start mb-6 border-b border-indigo-800/50 pb-4">
               <div>
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <span className="text-2xl">✉️</span> Reply to Inquiry
+                  <span className="text-2xl">✉️</span> Draft Reply
                 </h3>
                 <p className="text-xs text-indigo-300/80 mt-1">Directly email <span className="font-bold text-white">{emailReplyModal.name}</span></p>
               </div>
@@ -959,7 +1019,15 @@ export default function AdminDashboard() {
                     <td className="px-6 py-5 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-2">
                         
-                        {/* --- NEW: EMAIL REPLY BUTTON --- */}
+                        {/* --- UPDATED: VIEW & REPLY BUTTONS --- */}
+                        <button 
+                          onClick={() => setViewInquiryModal(inq)}
+                          className="bg-emerald-600/20 hover:bg-emerald-500/40 border border-emerald-500/50 text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm"
+                          title="Read Full Message"
+                        >
+                          👁️ READ
+                        </button>
+                        
                         <button 
                           onClick={() => setEmailReplyModal(inq)}
                           className="bg-blue-600/20 hover:bg-blue-500/40 border border-blue-500/50 text-blue-400 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm"
