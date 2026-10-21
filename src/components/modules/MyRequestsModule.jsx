@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import { LayoutList } from 'lucide-react';
 
 export function MyRequestsModule({ userEmail }) {
   const [requests, setRequests] = useState([]);
@@ -50,8 +51,10 @@ export function MyRequestsModule({ userEmail }) {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-indigo-800/30 pb-5">
         <div>
           <h3 className="text-2xl font-black text-white flex items-center gap-3 tracking-tight">
-            <span className="p-2 bg-indigo-900/40 rounded-xl border border-indigo-700/50 shadow-inner text-2xl">📑</span>
-            My Requests &amp; Inquiries
+            <div className="p-2 bg-indigo-900/40 rounded-xl border border-indigo-700/50 shadow-inner text-indigo-300">
+              <LayoutList className="w-6 h-6" strokeWidth={1.5} />
+            </div>
+              My Requests &amp; Inquiries
           </h3>
           <p className="text-sm text-indigo-300/70 mt-1">
             Monitor the review status of your trials, quotes, and service inquiries

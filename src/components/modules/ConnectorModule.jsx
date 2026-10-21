@@ -1,10 +1,11 @@
 "use client";
 import React, { useState } from 'react';
+import { Users, PieChart, Handshake, TrendingUp, ShoppingCart, Package, Wallet, Truck, Navigation, KanbanSquare } from 'lucide-react';
 
 const CONNECTOR_CONFIGS = {
   hr: {
     title: "Human Resources",
-    icon: "👥",
+    icon: Users,
     tagline: "Workforce scheduling, employee performance, and automated payroll",
     recordLabel: "Employee",
     initialData: [
@@ -16,7 +17,7 @@ const CONNECTOR_CONFIGS = {
   },
   ais: {
     title: "Accounting Information",
-    icon: "📊",
+    icon: PieChart,
     tagline: "General ledger entries, tax summaries, and financial reports",
     recordLabel: "Ledger Entry",
     initialData: [
@@ -27,7 +28,7 @@ const CONNECTOR_CONFIGS = {
   },
   crm: {
     title: "Customer Relationship Management",
-    icon: "🤝",
+    icon: Handshake,
     tagline: "Pipeline velocity, account retention, and client conversion",
     recordLabel: "Lead Record",
     initialData: [
@@ -38,7 +39,7 @@ const CONNECTOR_CONFIGS = {
   },
   pos: {
     title: "Point of Sale",
-    icon: "🛒",
+    icon: ShoppingCart,
     tagline: "Checkout terminals, barcode scans, and real-time sales tallies",
     recordLabel: "Transaction",
     initialData: [
@@ -49,7 +50,7 @@ const CONNECTOR_CONFIGS = {
   },
   fleet: {
     title: "Fleet & Logistics Management",
-    icon: "🚛",
+    icon: Navigation,
     tagline: "Route efficiency, asset geolocation, and fuel utilization",
     recordLabel: "Vehicle Asset",
     initialData: [
@@ -60,7 +61,7 @@ const CONNECTOR_CONFIGS = {
   },
   ims: {
     title: "Inventory Management System",
-    icon: "📦",
+    icon: Package,
     tagline: "Multi-warehouse supply chain, stock replenishments, and tracking",
     recordLabel: "Stock SKU",
     initialData: [
@@ -71,7 +72,7 @@ const CONNECTOR_CONFIGS = {
   },
   ewallet: {
     title: "E-Wallet & Payments",
-    icon: "💳",
+    icon: Wallet,
     tagline: "Multi-currency wallets, automated top-ups, and settlement routing",
     recordLabel: "Payout Transaction",
     initialData: [
@@ -82,7 +83,7 @@ const CONNECTOR_CONFIGS = {
   },
   parcel: {
     title: "Parcel & Shipment Tracking",
-    icon: "🚚",
+    icon: Truck,
     tagline: "Waybill dispatch, GPS milestone pings, and delivery confirm",
     recordLabel: "Consignment",
     initialData: [
@@ -93,7 +94,7 @@ const CONNECTOR_CONFIGS = {
   },
   mis: {
     title: "Management Information System",
-    icon: "📈",
+    icon: TrendingUp,
     tagline: "High-level department KPIs, cross-branch metrics, and summaries",
     recordLabel: "Reporting Metric",
     initialData: [
@@ -104,7 +105,7 @@ const CONNECTOR_CONFIGS = {
   },
   pms_proj: {
     title: "Project Management System",
-    icon: "📋",
+    icon: KanbanSquare,
     tagline: "Milestone completion, sprint allocation, and resource tracking",
     recordLabel: "Sprint Task",
     initialData: [
@@ -150,9 +151,9 @@ export function ConnectorModule({ systemId, companyName }) {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-indigo-800/30 pb-5">
         <div>
           <h3 className="text-2xl font-black text-white flex items-center gap-3 tracking-tight">
-            <span className="p-2 bg-indigo-900/40 rounded-xl border border-indigo-700/50 shadow-inner text-2xl">
-              {config.icon}
-            </span>
+            <div className="p-2 bg-indigo-900/40 rounded-xl border border-indigo-700/50 shadow-inner text-blue-400">
+              <config.icon className="w-6 h-6" strokeWidth={1.5} />
+            </div>
             {config.title}
           </h3>
           <p className="text-sm text-indigo-300/70 mt-1">{config.tagline}</p>

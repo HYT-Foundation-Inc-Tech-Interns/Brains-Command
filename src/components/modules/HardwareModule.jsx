@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from 'react';
+import { Monitor, Settings } from 'lucide-react';
 
 const hardwareProducts = [
   "Construction Auxiliaries", "Command Center", "GPS Tracker", "Accessories", "Auto Identification and Data Capture",
@@ -38,7 +39,9 @@ export function HardwareModule({ openInquiryModal }) {
       <div className="grid lg:grid-cols-2 gap-6 flex-shrink-0">
         <div className="bg-gradient-to-br from-[#13172e]/80 to-[#090b14]/80 border border-cyan-800/50 rounded-2xl p-6 shadow-lg flex flex-col group hover:border-cyan-500/50 transition-all backdrop-blur-sm">
           <div className="flex justify-between items-start mb-5">
-            <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 text-2xl border border-cyan-500/20 shadow-inner">🖥️</div>
+            <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 border border-cyan-500/20 shadow-inner">
+              <Monitor className="w-6 h-6" strokeWidth={1.5} />
+              </div>
             <span className="px-3 py-1 bg-cyan-500/10 text-cyan-400 text-[10px] font-bold uppercase tracking-widest rounded-full border border-cyan-500/30">Flagship</span>
           </div>
           <h4 className="text-lg font-bold text-white mb-2">Millennium Interactive Board</h4>
@@ -50,7 +53,9 @@ export function HardwareModule({ openInquiryModal }) {
 
         <div className="bg-gradient-to-br from-[#13172e]/80 to-[#090b14]/80 border border-emerald-800/50 rounded-2xl p-6 shadow-lg flex flex-col group hover:border-emerald-500/50 transition-all backdrop-blur-sm">
           <div className="flex justify-between items-start mb-5">
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 text-2xl border border-emerald-500/20 shadow-inner">⚙️</div>
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20 shadow-inner">
+              <Settings className="w-6 h-6" strokeWidth={1.5} />
+            </div>
             <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase tracking-widest rounded-full border border-emerald-500/30">Innovation</span>
           </div>
           <h4 className="text-lg font-bold text-white mb-2">THEHCO Tech Device</h4>
