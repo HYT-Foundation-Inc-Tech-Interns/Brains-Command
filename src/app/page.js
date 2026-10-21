@@ -4,6 +4,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 
+import { 
+  Users, PieChart, Handshake, TrendingUp, ShoppingCart, 
+  Package, Wallet, Truck, Navigation, KanbanSquare,
+  Phone, Mail, MapPin,
+  Building2, Landmark, ClipboardCheck, Cpu, Radio // <-- Added these 5
+} from 'lucide-react';
+
 // --- Sign In & Forgot Password Pop-up Modal Component ---
 const SignInModal = ({ onClose }) => {
   const [view, setView] = useState("login");
@@ -64,22 +71,19 @@ const SignInModal = ({ onClose }) => {
     const email = e.target.email.value;
 
     try {
-      const res = await fetch('/api/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+      // Direct Supabase call to send the recovery email
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        // This is the page we will build in Step 2
+        redirectTo: `${window.location.origin}/update-password`,
       });
 
-      const data = await res.json();
+      if (error) throw error;
 
-      if (res.ok) {
-        setMessage("Success! Check your email for the reset link.");
-        e.target.reset(); 
-      } else {
-        setMessage(data.message);
-      }
+      setMessage("Success! Check your email for the reset link.");
+      e.target.reset(); 
     } catch (error) {
-      setMessage("Connection error. Please try again.");
+      console.error(error);
+      setMessage("Failed to send reset link. Please check the email and try again.");
     }
   };
 
@@ -630,16 +634,16 @@ const hardwarePartners = [
 ];
 
 const connectorSystems = [
-  { id: "hr", icon: "👥", title: "Human Resources", tagline: "Empower your workforce.", desc: "Focuses on the organization's employee performance reviews, work schedules, paid days off, benefits, payroll and many more.", metric: "100%", metricLabel: "Payroll Accuracy", features: ["Performance Tracking", "Shift Scheduling", "Benefits Administration", "Automated Payroll"] },
-  { id: "ais", icon: "📊", title: "Accounting Information", tagline: "Financial clarity at your fingertips.", desc: "Tools and systems designed for the collection and display of accounting information so executives and accountants can make an informed decision for business.", metric: "Live", metricLabel: "Financial Reporting", features: ["General Ledger", "Accounts Payable/Receivable", "Tax Compliance", "Executive Dashboards"] },
-  { id: "crm", icon: "🤝", title: "Customer Relationship", tagline: "Drive sales and retention.", desc: "Focuses on improving customer service relationships and assisting in customer retention while driving the sales growth.", metric: "3x", metricLabel: "Faster Conversion", features: ["Contact Management", "Sales Pipeline", "Customer Support Tickets", "Marketing Automation"] },
-  { id: "mis", icon: "📈", title: "Management Information", tagline: "Data-driven leadership.", desc: "Produces regular reports on operations for every level of management in a company.", metric: "360°", metricLabel: "Operational Visibility", features: ["Automated Reporting", "Data Centralization", "Cross-department Analytics", "Decision Support"] },
-  { id: "pos", icon: "🛒", title: "Point of Sale", tagline: "Seamless checkout experiences.", desc: "A network that consists of the main computer linked with several checkout terminals and supported by different hardware features starting from barcode scanners to card payment terminals.", metric: "< 2s", metricLabel: "Transaction Time", features: ["Barcode Scanning", "Multi-terminal Sync", "Card Payment Integration", "Receipt Generation"] },
-  { id: "ims", icon: "📦", title: "Inventory Management", tagline: "Track goods end-to-end.", desc: "Managing your inventory in which it tracks the goods throughout your entire supply chain, from purchasing to production to end sales.", metric: "99.9%", metricLabel: "Stock Accuracy", features: ["Supply Chain Tracking", "Low Stock Alerts", "Purchase Order Automation", "Multi-warehouse Sync"] },
-  { id: "ewallet", icon: "💳", title: "E-Wallets", tagline: "Transactions at your fingertips.", desc: "Utilizing the efficiency of technology by bringing online transactions at the tip of our hands.", metric: "Secure", metricLabel: "End-to-End Encryption", features: ["Contactless Payments", "Fund Transfers", "Transaction History", "Multi-currency Support"] },
-  { id: "parcel", icon: "🚚", title: "Parcel Tracking", tagline: "Clear visibility into every journey.", desc: "A system that gives you a clear visibility into your parcel's journey for both local and international.", metric: "Live", metricLabel: "GPS Tracking Updates", features: ["International Routing", "Delivery Confirmation", "Customer Tracking Portal", "Dispatch Analytics"] },
-  { id: "fleet", icon: "🚛", title: "Fleet Management", tagline: "Optimize your enterprise logistics.", desc: "Enables business to accomplish a series of tasks in enterprise-wide management.", metric: "24/7", metricLabel: "Live Vehicle Tracking", features: ["Route Optimization", "Driver Performance", "Maintenance Scheduling", "Fuel Monitoring"] },
-  { id: "pms_proj", icon: "📋", title: "Project Management", tagline: "Plan, organize, and execute.", desc: "Focuses on managing a project by planning, organizing, and managing its different required aspects.", metric: "+40%", metricLabel: "Team Productivity", features: ["Task Delegation", "Gantt Charts", "Milestone Tracking", "Resource Allocation"] }
+  { id: "hr", icon: Users, title: "Human Resources", tagline: "Empower your workforce.", desc: "Focuses on the organization's employee performance reviews, work schedules, paid days off, benefits, payroll and many more.", metric: "100%", metricLabel: "Payroll Accuracy", features: ["Performance Tracking", "Shift Scheduling", "Benefits Administration", "Automated Payroll"] },
+  { id: "ais", icon: PieChart, title: "Accounting Information", tagline: "Financial clarity at your fingertips.", desc: "Tools and systems designed for the collection and display of accounting information so executives and accountants can make an informed decision for business.", metric: "Live", metricLabel: "Financial Reporting", features: ["General Ledger", "Accounts Payable/Receivable", "Tax Compliance", "Executive Dashboards"] },
+  { id: "crm", icon: Handshake, title: "Customer Relationship", tagline: "Drive sales and retention.", desc: "Focuses on improving customer service relationships and assisting in customer retention while driving the sales growth.", metric: "3x", metricLabel: "Faster Conversion", features: ["Contact Management", "Sales Pipeline", "Customer Support Tickets", "Marketing Automation"] },
+  { id: "mis", icon: TrendingUp, title: "Management Information", tagline: "Data-driven leadership.", desc: "Produces regular reports on operations for every level of management in a company.", metric: "360°", metricLabel: "Operational Visibility", features: ["Automated Reporting", "Data Centralization", "Cross-department Analytics", "Decision Support"] },
+  { id: "pos", icon: ShoppingCart, title: "Point of Sale", tagline: "Seamless checkout experiences.", desc: "A network that consists of the main computer linked with several checkout terminals and supported by different hardware features starting from barcode scanners to card payment terminals.", metric: "< 2s", metricLabel: "Transaction Time", features: ["Barcode Scanning", "Multi-terminal Sync", "Card Payment Integration", "Receipt Generation"] },
+  { id: "ims", icon: Package, title: "Inventory Management", tagline: "Track goods end-to-end.", desc: "Managing your inventory in which it tracks the goods throughout your entire supply chain, from purchasing to production to end sales.", metric: "99.9%", metricLabel: "Stock Accuracy", features: ["Supply Chain Tracking", "Low Stock Alerts", "Purchase Order Automation", "Multi-warehouse Sync"] },
+  { id: "ewallet", icon: Wallet, title: "E-Wallets", tagline: "Transactions at your fingertips.", desc: "Utilizing the efficiency of technology by bringing online transactions at the tip of our hands.", metric: "Secure", metricLabel: "End-to-End Encryption", features: ["Contactless Payments", "Fund Transfers", "Transaction History", "Multi-currency Support"] },
+  { id: "parcel", icon: Truck, title: "Parcel Tracking", tagline: "Clear visibility into every journey.", desc: "A system that gives you a clear visibility into your parcel's journey for both local and international.", metric: "Live", metricLabel: "GPS Tracking Updates", features: ["International Routing", "Delivery Confirmation", "Customer Tracking Portal", "Dispatch Analytics"] },
+  { id: "fleet", icon: Navigation, title: "Fleet Management", tagline: "Optimize your enterprise logistics.", desc: "Enables business to accomplish a series of tasks in enterprise-wide management.", metric: "24/7", metricLabel: "Live Vehicle Tracking", features: ["Route Optimization", "Driver Performance", "Maintenance Scheduling", "Fuel Monitoring"] },
+  { id: "pms_proj", icon: KanbanSquare, title: "Project Management", tagline: "Plan, organize, and execute.", desc: "Focuses on managing a project by planning, organizing, and managing its different required aspects.", metric: "+40%", metricLabel: "Team Productivity", features: ["Task Delegation", "Gantt Charts", "Milestone Tracking", "Resource Allocation"] }
 ];
 
 const agencyServices = [
@@ -680,7 +684,7 @@ const modulesData = [
   {
     id: "hms",
     badge: "HMS",
-    icon: "🏨",
+    icon: Building2,
     title: "Hotel Management System",
     brainsName: "Frontdesk",
     tagline: "End-to-end hotel operations, unified.",
@@ -697,7 +701,7 @@ const modulesData = [
   {
     id: "pms",
     badge: "PMS",
-    icon: "🏢",
+    icon: Landmark,
     title: "Property Management System",
     brainsName: "Landlord",
     tagline: "Manage every asset class from one platform.",
@@ -714,7 +718,7 @@ const modulesData = [
   {
     id: "hvms",
     badge: "HVMS",
-    icon: "📋",
+    icon: ClipboardCheck,
     title: "Visitor Management System",
     brainsName: "Butler",
     tagline: "Frictionless arrivals. Secure premises.",
@@ -731,7 +735,7 @@ const modulesData = [
   {
     id: "bms",
     badge: "BMS",
-    icon: "🏗️",
+    icon: Cpu,
     title: "Building Management System",
     brainsName: "Sekyu",
     tagline: "Intelligent infrastructure, always on.",
@@ -748,7 +752,7 @@ const modulesData = [
   {
     id: "iot",
     badge: "IoT",
-    icon: "📡",
+    icon: Radio,
     title: "Internet of Things",
     brainsName: "Housekeeper",
     tagline: "Every sensor. One command layer.",
@@ -770,7 +774,7 @@ const navLinks = [
   { id: "connector", label: "Connector", href: "#connector" },
   { id: "services", label: "Agency Services", href: "#services" },
   { id: "brands", label: "Our Brands", href: "#brands" },
-  { id: "hardware", label: "Hardware", href: "#hardware" },
+  { id: "hardware", label: "Our Products", href: "#hardware" },
   { id: "contact", label: "Contact", href: "#contact" },
 ];
 
@@ -786,11 +790,13 @@ const FeatureCard = ({ title, desc }) => (
 const ModuleSection = ({ data }) => (
   <section className="py-24 border-b border-indigo-900/30 max-w-[1600px] mx-auto px-8 lg:px-12 scroll-mt-20">
     <FadeIn>
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-4 mb-6">
         <span className="text-[10px] font-mono border border-fuchsia-800/50 bg-fuchsia-900/20 text-fuchsia-300 px-2 py-1 rounded">
           {data.badge}
         </span>
-        <span className="text-2xl">{data.icon}</span>
+        <div className="text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.4)]">
+          <data.icon className="w-8 h-8" strokeWidth={1.5} />
+        </div>
       </div>
       
       <h2 className="text-4xl md:text-5xl font-bold mb-4 text-white">
@@ -884,7 +890,9 @@ const ConnectorShowcase = () => {
                     : 'bg-[#13172e]/40 border border-transparent hover:border-indigo-700 hover:bg-[#13172e]/80'
                 }`}
               >
-                <span className="text-2xl mr-4">{sys.icon}</span>
+                <div className={`mr-4 transition-colors ${activeId === sys.id ? 'text-blue-400' : 'text-indigo-400'}`}>
+                  <sys.icon className="w-6 h-6" strokeWidth={1.5} />
+                </div>
                 <div>
                   <h4 className={`text-sm font-bold ${activeId === sys.id ? 'text-blue-400' : 'text-indigo-100'}`}>{sys.title}</h4>
                 </div>
@@ -904,8 +912,8 @@ const ConnectorShowcase = () => {
               
               <div className="relative z-10 animate-fadeIn" key={activeSystem.id}>
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-violet-500/30 flex items-center justify-center text-3xl shadow-[0_0_15px_rgba(59,130,246,0.2)]">
-                    {activeSystem.icon}
+                  <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-violet-500/30 flex items-center justify-center text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                    <activeSystem.icon className="w-8 h-8" strokeWidth={1.5} />
                   </div>
                   <div>
                     <h3 className="text-3xl font-bold text-white mb-1">{activeSystem.title}</h3>
@@ -1076,20 +1084,30 @@ export default function CentralCommand() {
         </FadeIn>
       </header>
 
-      {/* --- UPDATED: CLIENT ROSTER MARQUEE (Larger, colored images with hover scale) --- */}
-      <div className="border-b border-indigo-900/30 bg-[#060810]/80 py-10 overflow-hidden">
+      {/* --- UPDATED: CLIENT ROSTER MARQUEE --- */}
+      <div className="border-b border-indigo-900/30 bg-[#060810]/80 py-10 overflow-hidden relative">
+        <style>{`
+          @keyframes scroll-left { 0% { transform: translateX(0); } 100% { transform: translateX(calc(-50% - 1rem)); } }
+          .animate-scroll-left { animation: scroll-left 40s linear infinite; width: max-content; }
+          .hover-pause:hover { animation-play-state: paused; }
+          .fade-edges { mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); }
+        `}</style>
         <div className="max-w-[1600px] mx-auto px-8 lg:px-12 flex flex-col md:flex-row items-center gap-8">
-          <span className="text-xs font-bold text-indigo-400/80 uppercase tracking-widest whitespace-nowrap">Trusted By Industry Leaders:</span>
-          <div className="flex flex-wrap justify-center md:justify-start gap-10 md:gap-14 items-center w-full">
-            {clients.map((client, idx) => (
-              <img 
-                key={idx} 
-                src={client.image} 
-                alt={client.name} 
-                title={client.name}
-                className="h-10 md:h-14 object-contain hover:scale-110 transition-transform duration-300 drop-shadow-sm cursor-default"
-              />
-            ))}
+          <span className="text-xs font-bold text-indigo-400/80 uppercase tracking-widest whitespace-nowrap shrink-0 relative z-10">Trusted By Industry Leaders:</span>
+          
+          <div className="fade-edges overflow-hidden w-full relative">
+            <div className="flex space-x-14 animate-scroll-left hover-pause items-center">
+              {/* Render the list twice to create the infinite loop effect */}
+              {[...clients, ...clients].map((client, idx) => (
+                <img 
+                  key={idx} 
+                  src={client.image} 
+                  alt={client.name} 
+                  title={client.name}
+                  className="h-10 md:h-14 object-contain hover:scale-110 transition-transform duration-300 drop-shadow-sm cursor-default"
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -1338,7 +1356,7 @@ export default function CentralCommand() {
             </FadeIn>
           </div>
 
-          {/* --- UPDATED: AUTHORIZED PARTNER NETWORK (Glassmorphism + Colored Logos) --- */}
+         {/* --- UPDATED: AUTHORIZED PARTNER NETWORK --- */}
           <div className="mt-20 max-w-5xl mx-auto w-full">
             <FadeIn delay={200}>
               <div className="bg-[#13172e]/40 border border-indigo-800/50 rounded-2xl p-10 shadow-2xl relative overflow-hidden">
@@ -1346,17 +1364,22 @@ export default function CentralCommand() {
                 
                 <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-8 text-center relative z-10 border-b border-indigo-900/50 pb-4">Authorized Partner Network</h4>
                 
-                <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10 relative z-10">
-                  {hardwarePartners.map((partner, idx) => (
-                    <div key={idx} className="bg-[#13172e]/60 backdrop-blur-sm border border-indigo-700/50 rounded-2xl py-6 px-8 hover:border-cyan-500/80 hover:bg-[#1a1f3c] transition-all cursor-default shadow-lg hover:shadow-cyan-500/20 hover:-translate-y-1 group flex items-center justify-center min-w-[160px]">
-                      <img 
-                        src={partner.image} 
-                        alt={partner.name}
-                        title={partner.name}
-                        className="h-12 md:h-16 object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-md" 
-                      />
-                    </div>
-                  ))}
+                {/* Infinite Marquee Container */}
+                <div className="fade-edges overflow-hidden w-full relative z-10">
+                  <div className="flex space-x-8 animate-scroll-right hover-pause items-center">
+                    {/* Render the list twice for infinite loop */}
+              {/* Render the list twice for infinite loop */}
+              {[...hardwarePartners, ...hardwarePartners].map((partner, idx) => (
+                <div key={idx} className="bg-white rounded-2xl py-6 px-8 border-2 border-transparent hover:border-cyan-400 transition-all cursor-default shadow-[0_4px_15px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_25px_rgba(6,182,212,0.4)] hover:-translate-y-1 flex items-center justify-center min-w-[160px] h-[100px]">
+                <img 
+                  src={partner.image} 
+                    alt={partner.name}
+                    title={partner.name}
+                   className="max-h-full max-w-full object-contain" 
+                    />
+                     </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </FadeIn>
@@ -1381,8 +1404,8 @@ export default function CentralCommand() {
                 <div className="flex flex-col gap-8">
                   {/* Address */}
                   <div className="flex items-center gap-6 group">
-                    <div className="w-16 h-16 rounded-2xl bg-[#13172e] border border-indigo-800/50 flex items-center justify-center text-3xl group-hover:border-fuchsia-500/50 group-hover:bg-fuchsia-900/20 transition-all shadow-md shrink-0">
-                      🏢
+                    <div className="w-16 h-16 rounded-2xl bg-[#13172e] border border-indigo-800/50 flex items-center justify-center text-indigo-400 group-hover:border-fuchsia-500/50 group-hover:text-fuchsia-400 group-hover:bg-fuchsia-900/20 transition-all shadow-md shrink-0">
+                      <MapPin className="w-7 h-7" strokeWidth={1.5} />
                     </div>
                     <div>
                       <h4 className="text-lg font-bold text-white mb-1">Corporate Headquarters</h4>
@@ -1394,9 +1417,9 @@ export default function CentralCommand() {
                   </div>
 
                   {/* Phone */}
-                  <div className="flex items-center gap-6 group">
-                    <div className="w-16 h-16 rounded-2xl bg-[#13172e] border border-indigo-800/50 flex items-center justify-center text-3xl group-hover:border-fuchsia-500/50 group-hover:bg-fuchsia-900/20 transition-all shadow-md shrink-0">
-                      📞
+                   <div className="flex items-center gap-6 group">
+                    <div className="w-16 h-16 rounded-2xl bg-[#13172e] border border-indigo-800/50 flex items-center justify-center text-indigo-400 group-hover:border-fuchsia-500/50 group-hover:text-fuchsia-400 group-hover:bg-fuchsia-900/20 transition-all shadow-md shrink-0">
+                      <Phone className="w-7 h-7" strokeWidth={1.5} />
                     </div>
                     <div>
                       <h4 className="text-lg font-bold text-white mb-1">Direct Lines</h4>
@@ -1406,8 +1429,8 @@ export default function CentralCommand() {
 
                   {/* Email */}
                   <div className="flex items-center gap-6 group">
-                    <div className="w-16 h-16 rounded-2xl bg-[#13172e] border border-indigo-800/50 flex items-center justify-center text-3xl group-hover:border-fuchsia-500/50 group-hover:bg-fuchsia-900/20 transition-all shadow-md shrink-0">
-                      ✉️
+                    <div className="w-16 h-16 rounded-2xl bg-[#13172e] border border-indigo-800/50 flex items-center justify-center text-indigo-400 group-hover:border-fuchsia-500/50 group-hover:text-fuchsia-400 group-hover:bg-fuchsia-900/20 transition-all shadow-md shrink-0">
+                      <Mail className="w-7 h-7" strokeWidth={1.5} />
                     </div>
                     <div>
                       <h4 className="text-lg font-bold text-white mb-1">Email Support</h4>
