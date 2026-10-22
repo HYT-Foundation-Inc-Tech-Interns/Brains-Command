@@ -98,10 +98,10 @@ const SignInModal = ({ onClose }) => {
     e.preventDefault();
     setMessage("Verifying code...");
 
-    const code = e.target.code.value.trim();
+    const code = e.target.code.value.replace(/\D/g, '');
 
     try {
-      // Verifies the 6-digit code and opens a short-lived recovery session
+      // Verifies the emailed code and opens a short-lived recovery session
       const { error } = await supabase.auth.verifyOtp({
         email: resetEmail,
         token: code,
@@ -146,7 +146,7 @@ const SignInModal = ({ onClose }) => {
           </h2>
           <p className="text-sm text-indigo-300/80">
             {view === "login" && "Sign in to Central Command"}
-            {view === "forgot" && "We'll email you a 6-digit code and a secure link"}
+            {view === "forgot" && "We'll email you a verification code and a secure link"}
             {view === "code" && <>Sent to <span className="font-semibold text-white">{resetEmail}</span></>}
           </p>
         </div>
@@ -193,18 +193,23 @@ const SignInModal = ({ onClose }) => {
         ) : (
           <form className="space-y-4" onSubmit={handleVerifyCode}>
             <div>
-              <label className="block text-xs font-bold text-indigo-300 mb-1 uppercase tracking-wide">6-Digit Code</label>
+              <label className="block text-xs font-bold text-indigo-300 mb-1 uppercase tracking-wide">Verification Code</label>
               <input
                 name="code"
                 type="text"
                 inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{6}"
-                maxLength={6}
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                maxLength={10}
                 required
                 autoFocus
-                className="w-full bg-[#090b14] border border-indigo-800/50 rounded-lg px-4 py-3 text-center text-2xl font-mono tracking-[0.5em] text-white placeholder-indigo-500/50 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/50 transition-colors"
-                placeholder="••••••"
+                onChange={(e) => {
+                  // Chrome autofill can dump the email in here; keep digits only
+                  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                }}
+                className="w-full bg-[#090b14] border border-indigo-800/50 rounded-lg px-4 py-3 text-center text-xl font-mono tracking-[0.3em] text-white placeholder-indigo-500/50 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/50 transition-colors"
+                placeholder="••••••••"
               />
             </div>
 
