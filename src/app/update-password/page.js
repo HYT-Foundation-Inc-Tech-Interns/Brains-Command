@@ -74,17 +74,40 @@ export default function UpdatePasswordPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
+  const [checking, setChecking] = useState(true);
+  const [sessionError, setSessionError] = useState('');
 
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        window.location.href = '/'; 
-      } else {
+    let cancelled = false;
+
+    // Supabase parses the recovery token out of the URL hash asynchronously,
+    // so a session may appear a moment after the page mounts.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user && !cancelled) {
         setUser(session.user);
+        setChecking(false);
       }
+    });
+
+    const timer = setTimeout(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled) return;
+
+      if (session?.user) {
+        setUser(session.user);
+      } else {
+        setSessionError(
+          'This reset link is invalid or has expired. Request a new code from the sign-in screen.'
+        );
+      }
+      setChecking(false);
+    }, 1200);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      subscription?.unsubscribe();
     };
-    checkSession();
   }, []);
 
   const handleUpdatePassword = async (e) => {
@@ -132,8 +155,24 @@ export default function UpdatePasswordPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#090b14] flex items-center justify-center font-sans">
-        <div className="text-indigo-400 animate-pulse font-mono tracking-widest text-sm">Verifying secure token...</div>
+      <div className="min-h-screen bg-[#090b14] flex items-center justify-center p-4 font-sans">
+        {checking ? (
+          <div className="text-indigo-400 animate-pulse font-mono tracking-widest text-sm">Verifying secure token...</div>
+        ) : (
+          <div className="w-full max-w-md bg-[#13172e]/80 backdrop-blur-xl border border-indigo-800/50 rounded-2xl p-8 text-center relative z-10">
+            <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-8 h-8 text-red-400" strokeWidth={1.5} />
+            </div>
+            <h2 className="text-xl font-black text-white mb-2 tracking-tight">Link no longer valid</h2>
+            <p className="text-xs text-indigo-300/80 leading-relaxed mb-6">{sessionError}</p>
+            <button
+              onClick={() => { window.location.href = '/'; }}
+              className="w-full bg-gradient-to-r from-fuchsia-600 to-blue-600 hover:from-fuchsia-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl transition-all active:scale-95"
+            >
+              Back to Sign In
+            </button>
+          </div>
+        )}
       </div>
     );
   }
