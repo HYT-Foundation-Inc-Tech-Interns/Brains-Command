@@ -149,6 +149,76 @@ export default function AdminDashboard() {
   const [subFilter, setSubFilter] = useState('all');
   const [inquiriesFilter, setInquiriesFilter] = useState('All');
 
+  // Gate: no admin dashboard renders until the one-time code is confirmed.
+  const [gate, setGate] = useState('checking'); // checking | code | ready | denied
+  const [gateCode, setGateCode] = useState('');
+  const [gateMessage, setGateMessage] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkAccess = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.href = '/';
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+
+      if (cancelled) return;
+
+      if (profile?.role !== 'admin') {
+        setGateMessage('This account does not have administrator access.');
+        setGate('denied');
+        return;
+      }
+
+      const res = await fetch('/api/auth/verify-admin-code', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const status = await res.json();
+
+      if (cancelled) return;
+      setGate(status.requiresVerification ? 'code' : 'ready');
+    };
+
+    checkAccess();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleUnlockAdmin = async (e) => {
+    e.preventDefault();
+    setGateMessage('');
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/auth/verify-admin-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ code: gateCode }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setGateMessage(data.message || 'Could not verify the code.');
+        return;
+      }
+
+      setGate('ready');
+    } catch (err) {
+      setGateMessage('Connection error. Please try again.');
+    }
+  };
+
   useEffect(() => {
     setSearchQuery('');
     setStatusFilter('all');
@@ -283,8 +353,6 @@ export default function AdminDashboard() {
     const firstName = e.target.firstName.value;
     const lastName = e.target.lastName.value;
     
-    const tempPassword = Math.random().toString(36).slice(-8) + "B!1"; 
-
     try {
       const res = await fetch('/api/admin/users', {
         method: 'POST',
@@ -292,27 +360,15 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           action: 'createAdmin',
           email,
-          password: tempPassword,
           firstName,
           lastName
         })
       });
       
-      if (!res.ok) throw new Error("Failed to create admin account. Check backend permissions.");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to create admin account.");
 
-      const emailBody = `Hello ${firstName},\n\nYou have been added as an Administrator to the Brains Central Command Dashboard.\n\nYour secure login credentials are:\nEmail: ${email}\nTemporary Password: ${tempPassword}\n\nPlease log in and change your password immediately.`;
-      
-      await fetch('/api/admin/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: email,
-          subject: "Secure Credentials: Admin Access Granted",
-          message: emailBody
-        })
-      });
-
-      alert("Admin created successfully! Credentials have been sent to their email.");
+      alert(data.message || "Administrator created. A one-time access code has been emailed to them.");
       setAddAdminModal(false);
       fetchUsers();
     } catch (err) {
@@ -519,6 +575,62 @@ export default function AdminDashboard() {
             Retry Connection
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (gate !== 'ready') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#090b14] p-4 font-sans text-gray-100">
+        {gate === 'checking' && (
+          <div className="text-indigo-400 animate-pulse font-mono tracking-widest text-sm">
+            Verifying administrator access...
+          </div>
+        )}
+
+        {gate === 'denied' && (
+          <div className="w-full max-w-md bg-[#13172e] border border-red-500/40 rounded-2xl p-8 text-center">
+            <AlertTriangle className="w-10 h-10 text-red-400 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-white mb-2">Access denied</h2>
+            <p className="text-xs text-indigo-300/80 mb-6">{gateMessage}</p>
+            <button onClick={handleLogout} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl transition-colors">
+              Back to Sign In
+            </button>
+          </div>
+        )}
+
+        {gate === 'code' && (
+          <form onSubmit={handleUnlockAdmin} className="w-full max-w-md bg-[#13172e] border border-fuchsia-500/50 rounded-2xl p-8 shadow-[0_0_40px_rgba(217,70,239,0.2)]">
+            <div className="w-14 h-14 bg-fuchsia-500/10 border border-fuchsia-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Lock className="w-7 h-7 text-fuchsia-400" />
+            </div>
+            <h2 className="text-xl font-bold text-white text-center mb-2">Administrator verification</h2>
+            <p className="text-xs text-indigo-300/80 text-center mb-6 leading-relaxed">
+              Enter the one-time code sent to your email. This is required once, then your email and password are enough.
+            </p>
+
+            {gateMessage && (
+              <p className="mb-4 text-center text-xs font-semibold text-red-400">{gateMessage}</p>
+            )}
+
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={10}
+              required
+              autoFocus
+              value={gateCode}
+              onChange={(e) => setGateCode(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              className="w-full bg-[#090b14] border border-fuchsia-800/60 rounded-xl px-4 py-3 text-center text-xl font-mono tracking-[0.3em] text-white focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/50"
+              placeholder="••••••••"
+            />
+
+            <button type="submit" className="w-full mt-5 bg-gradient-to-r from-fuchsia-600 to-blue-600 hover:from-fuchsia-500 hover:to-blue-500 text-white font-bold py-3 rounded-xl transition-all active:scale-95">
+              Unlock Dashboard
+            </button>
+          </form>
+        )}
       </div>
     );
   }
@@ -1086,7 +1198,7 @@ export default function AdminDashboard() {
             <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-2">
               <ShieldAlert className="w-6 h-6 text-fuchsia-500"/> Add Administrator
             </h3>
-            <p className="text-xs text-indigo-300/80 mb-6">Create a new admin account. A secure temporary password will be generated and emailed directly to them.</p>
+            <p className="text-xs text-indigo-300/80 mb-6">Create a new admin account. A secure temporary password and a one-time access code will be emailed to them. They must enter the code once before the dashboard unlocks.</p>
 
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
