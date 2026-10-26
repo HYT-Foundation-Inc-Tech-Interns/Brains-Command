@@ -15,12 +15,20 @@ const C = {
   accentInk: '#86198f',
 };
 
+const DEFAULT_FOOTER = `
+  <p style="margin:0 0 6px;font-family:${FONT};font-size:11px;line-height:1.6;color:${C.muted};">
+    This is an automated message from Brains Infinite Innovations. Replies are not monitored.
+  </p>
+  <p style="margin:0;font-family:${FONT};font-size:11px;line-height:1.6;color:${C.muted};">
+    Need help? Contact <a href="mailto:hello@brains.asia" style="color:${C.accent};text-decoration:none;">hello@brains.asia</a>
+  </p>`;
+
 /**
  * Wraps content in a 600px, table-based, inline-styled shell.
  * Tables + inline styles because Gmail strips <style> blocks and Outlook
  * has no support for flexbox/grid.
  */
-function layout({ preheader, title, content }) {
+function layout({ preheader, title, content, footer }) {
   return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -63,12 +71,7 @@ function layout({ preheader, title, content }) {
           <!-- Footer -->
           <tr>
             <td style="padding:20px 32px;background:${C.soft};border-top:1px solid ${C.border};">
-              <p style="margin:0 0 6px;font-family:${FONT};font-size:11px;line-height:1.6;color:${C.muted};">
-                This is an automated message from Brains Infinite Innovations. Replies are not monitored.
-              </p>
-              <p style="margin:0;font-family:${FONT};font-size:11px;line-height:1.6;color:${C.muted};">
-                Need help? Contact <a href="mailto:hello@brains.asia" style="color:${C.accent};text-decoration:none;">hello@brains.asia</a>
-              </p>
+              ${footer ?? DEFAULT_FOOTER}
             </td>
           </tr>
 
@@ -241,6 +244,230 @@ export function adminAccessEmail({ firstName, email, code, tempPassword, expires
       `The code expires ${expiresIn} after this email was sent.`,
       '',
       'Change your temporary password immediately after signing in.',
+    ].join('\n'),
+  };
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[c]);
+}
+
+export function adminReplyEmail({ customerName, subject, body }) {
+  const greeting = customerName ? `Hello ${customerName},` : 'Hello,';
+
+  const content = [
+    heading(escapeHtml(subject || 'Reply from Brains Central Command')),
+    paragraph(greeting),
+    `<div style="margin:0 0 16px;padding:16px;background:${C.soft};border-left:3px solid ${C.accent};border-radius:0 8px 8px 0;font-family:${FONT};font-size:15px;line-height:1.7;color:${C.body};white-space:pre-wrap;">${escapeHtml(body)}</div>`,
+    notice('Reply to this email to continue the conversation. Your response is delivered straight back to our request tracker, so nothing gets lost.'),
+  ].join('');
+
+  return {
+    subject: subject || 'Reply from Brains Central Command',
+    html: layout({
+      preheader: escapeHtml(String(body).slice(0, 120)),
+      title: subject || 'Reply from Brains Central Command',
+      content,
+    }),
+    text: [greeting, '', body, '', 'Reply to this email to continue the conversation.'].join('\n'),
+  };
+}
+
+export function passwordChangeCodeEmail({ email, code, expiresIn = '15 minutes' }) {
+  const content = [
+    heading('Confirm your password change'),
+    paragraph(`We received a request to change the password for <strong style="color:${C.ink};">${email}</strong>. Enter the code below to finish. Your current password keeps working until you do.`),
+
+    `<p style="margin:24px 0 8px;font-family:${FONT};font-size:10px;font-weight:bold;letter-spacing:1.8px;text-transform:uppercase;color:${C.muted};">Verification code</p>`,
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td align="center" style="padding:18px 12px;background:${C.soft};border:1px solid ${C.border};border-radius:10px;">
+          <span style="font-family:${MONO};font-size:28px;font-weight:bold;letter-spacing:8px;color:${C.accentInk};">${code}</span>
+        </td>
+      </tr>
+    </table>`,
+
+    notice(`This code expires in ${expiresIn} and can be used only once. If you did not request this change, ignore this email — your password will stay exactly as it is.`),
+  ].join('');
+
+  return {
+    subject: `${code} is your Brains Central Command password change code`,
+    html: layout({
+      preheader: `Your password change code is ${code}. It expires in ${expiresIn}.`,
+      title: 'Confirm your password change',
+      content,
+    }),
+    text: [
+      'Confirm your Brains Central Command password change',
+      '',
+      `Verification code: ${code}`,
+      '',
+      `This code expires in ${expiresIn} and can be used only once.`,
+      'If you did not request this change, ignore this email — your password will not change.',
+    ].join('\n'),
+  };
+}
+
+export function billingReceiptEmail({
+  firstName,
+  email,
+  invoiceNumber,
+  amount,
+  currency = 'PHP',
+  description,
+  modules = [],
+  paidAt,
+  last4,
+}) {
+  const greeting = firstName ? `Hello ${escapeHtml(firstName)},` : 'Hello,';
+  const total = `${currency} ${Number(amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+  const when = paidAt ? new Date(paidAt).toUTCString() : new Date().toUTCString();
+
+  const rows = [
+    detailRow('Invoice', escapeHtml(invoiceNumber)),
+    detailRow('Date', when),
+    detailRow('Description', escapeHtml(description || 'Module subscription')),
+    modules.length ? detailRow('Modules', modules.map(escapeHtml).join(', ')) : '',
+    last4 ? detailRow('Card', `•••• ${escapeHtml(last4)}`) : '',
+    detailRow('Total paid', `<strong style="color:${C.ink};">${total}</strong>`),
+  ].join('');
+
+  const content = [
+    heading('Payment received'),
+    paragraph(`${greeting} Your payment went through and your modules are now active.`),
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 0;border-top:1px solid ${C.border};border-bottom:1px solid ${C.border};">${rows}</table>`,
+    button(`${SITE_URL}/user-dashboard`, 'Open Billing & Subscription'),
+    notice('Keep this email as your receipt. Invoices are also available any time under Billing &amp; Subscription in your dashboard.'),
+  ].join('');
+
+  return {
+    subject: `Receipt ${invoiceNumber} — Brains Central Command`,
+    html: layout({
+      preheader: `Payment of ${total} received. Invoice ${invoiceNumber}.`,
+      title: 'Payment received',
+      content,
+    }),
+    text: [
+      'Payment received — Brains Central Command',
+      '',
+      greeting,
+      '',
+      `Invoice: ${invoiceNumber}`,
+      `Date: ${when}`,
+      `Description: ${description || 'Module subscription'}`,
+      modules.length ? `Modules: ${modules.join(', ')}` : '',
+      last4 ? `Card: **** ${last4}` : '',
+      `Total paid: ${total}`,
+      '',
+      `View your billing: ${SITE_URL}/user-dashboard`,
+    ].filter(Boolean).join('\n'),
+  };
+}
+
+export function subscriptionCanceledEmail({ firstName, email, modules = [], canceledAt }) {
+  const greeting = firstName ? `Hello ${escapeHtml(firstName)},` : 'Hello,';
+  const when = canceledAt ? new Date(canceledAt).toUTCString() : new Date().toUTCString();
+  const list = modules.length ? modules.map(escapeHtml).join(', ') : 'All modules';
+
+  const content = [
+    heading('Subscription canceled'),
+    paragraph(`${greeting} Your subscription has been canceled and access to the modules below has ended.`),
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 0;border-top:1px solid ${C.border};border-bottom:1px solid ${C.border};">`
+      + detailRow('Canceled', when)
+      + detailRow('Modules', list)
+      + detailRow('Account', escapeHtml(email))
+      + '</table>',
+    paragraph('Your data is retained, so you can re-subscribe at any time and pick up where you left off.', { last: true }),
+    button(`${SITE_URL}/user-dashboard`, 'Review Billing & Subscription'),
+    notice(`<strong style="color:${C.ink};">Didn't ask for this?</strong> Contact us at <a href="mailto:hello@brains.asia" style="color:${C.accentInk};text-decoration:none;font-weight:bold;">hello@brains.asia</a> right away.`),
+  ].join('');
+
+  return {
+    subject: 'Your Brains Central Command subscription was canceled',
+    html: layout({
+      preheader: `Subscription canceled for ${list}.`,
+      title: 'Subscription canceled',
+      content,
+    }),
+    text: [
+      'Subscription canceled — Brains Central Command',
+      '',
+      greeting,
+      '',
+      `Canceled: ${when}`,
+      `Modules: ${list}`,
+      `Account: ${email}`,
+      '',
+      'Your data is retained, so you can re-subscribe at any time.',
+      'If you did not request this, contact hello@brains.asia.',
+    ].join('\n'),
+  };
+}
+
+
+/**
+ * Marketing / announcement email composed in the admin dashboard.
+ * Body is plain text (blank line = new paragraph); images are public URLs.
+ */
+export function campaignEmail({
+  subject,
+  body,
+  images = [],
+  recipientName,
+  unsubscribeUrl: optOutUrl,
+}) {
+  const safeSubject = escapeHtml(subject || 'News from Brains Infinite Innovations');
+  const firstName = String(recipientName || '').trim().split(/\s+/)[0];
+  const greeting = firstName ? `Hello ${escapeHtml(firstName)},` : 'Hello,';
+
+  const paragraphs = String(body || '')
+    .split(/\n{2,}/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+    .map((chunk) => paragraph(escapeHtml(chunk).replace(/\n/g, '<br>')))
+    .join('');
+
+  const gallery = (images || [])
+    .map(
+      (url) =>
+        `<img src="${escapeHtml(url)}" alt="" width="536" style="display:block;width:100%;max-width:536px;height:auto;margin:0 0 14px;border:1px solid ${C.border};border-radius:10px;">`
+    )
+    .join('');
+
+  const optOut = optOutUrl || `${SITE_URL}/`;
+
+  const footer = `
+  <p style="margin:0 0 8px;font-family:${FONT};font-size:11px;line-height:1.6;color:${C.muted};">
+    You are receiving this email because you are a Brains Infinite Innovations customer or you asked us about our services.
+  </p>
+  <p style="margin:0;font-family:${FONT};font-size:11px;line-height:1.6;color:${C.muted};">
+    Brains Infinite Innovations &middot; <a href="mailto:hello@brains.asia" style="color:${C.muted};text-decoration:none;">hello@brains.asia</a>
+    &middot; <a href="${escapeHtml(optOut)}" style="color:${C.muted};text-decoration:underline;">Unsubscribe</a>
+  </p>`;
+
+  const content = paragraph(greeting) + paragraphs + gallery;
+
+  return {
+    subject: subject || 'News from Brains Infinite Innovations',
+    html: layout({
+      preheader: escapeHtml(String(body || '').replace(/\s+/g, ' ').slice(0, 120)),
+      title: safeSubject,
+      content,
+      footer,
+    }),
+    text: [
+      greeting,
+      '',
+      String(body || ''),
+      '',
+      `Unsubscribe: ${optOut}`,
+      'Brains Infinite Innovations · hello@brains.asia',
     ].join('\n'),
   };
 }

@@ -713,15 +713,28 @@ const ParticleBackground = () => {
 };
 
 // --- Bulletproof Animation Wrapper ---
+// Starts VISIBLE so the server-rendered HTML is readable even when the client
+// bundle never runs (blocked script, stale chunk, failed hydration). Only
+// content that is below the fold at mount is hidden and faded in on scroll,
+// so a JS failure can never blank the page.
 const FadeIn = ({ children, delay = 0, direction = "up" }) => {
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
   const domRef = useRef(null);
 
   useEffect(() => {
     const node = domRef.current;
     if (!node) return;
 
-    const fallback = setTimeout(() => setIsVisible(true), 1200);
+    // Already on screen at mount: leave it exactly as rendered.
+    const rect = node.getBoundingClientRect();
+    if (rect.top < window.innerHeight && rect.bottom > 0) return;
+
+    if (typeof IntersectionObserver === "undefined") return;
+
+    setIsVisible(false);
+
+    // Safety net: never leave off-screen content hidden forever.
+    const fallback = setTimeout(() => setIsVisible(true), 3000);
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -740,7 +753,7 @@ const FadeIn = ({ children, delay = 0, direction = "up" }) => {
 
     return () => {
       clearTimeout(fallback);
-      if (node) observer.unobserve(node);
+      observer.unobserve(node);
     };
   }, []);
 
