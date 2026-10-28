@@ -471,3 +471,46 @@ export function campaignEmail({
     ].join('\n'),
   };
 }
+
+export function welcomeEmail({ firstName, lastName, email, company, createdAt }) {
+  const name = firstName ? firstName.trim() : 'there';
+  const fullName = [firstName, lastName].filter(Boolean).join(' ');
+  const when = createdAt || new Date().toUTCString();
+
+  const content = [
+    heading('Welcome aboard, ' + name),
+    paragraph('Your Brains Central Command account has been created. You can sign in at any time with <strong style="color:' + C.ink + ';">' + email + '</strong> and start configuring the modules your property needs.'),
+
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 0;border-top:1px solid ' + C.border + ';border-bottom:1px solid ' + C.border + ';">'
+      + detailRow('Account', email)
+      + detailRow('Name', fullName || 'Not provided')
+      + detailRow('Company', company || 'Not provided')
+      + detailRow('Created', when)
+      + '</table>',
+
+    button(SITE_URL + '/', 'Sign In to Central Command'),
+    notice('Keep this email for your records. If you did not create this account, write to <a href="mailto:hello@brains.asia" style="color:' + C.accentInk + ';text-decoration:none;font-weight:bold;">hello@brains.asia</a> and we will remove it.'),
+  ].join('');
+
+  return {
+    subject: 'Your Brains Central Command account is ready',
+    html: layout({
+      preheader: 'Your account for ' + email + ' has been created.',
+      title: 'Account created',
+      content,
+    }),
+    text: [
+      'Welcome aboard, ' + name + '.',
+      '',
+      'Your Brains Central Command account has been created.',
+      '',
+      'Account: ' + email,
+      'Company: ' + (company || 'Not provided'),
+      'Created: ' + when,
+      '',
+      'Sign in: ' + SITE_URL + '/',
+      '',
+      'If you did not create this account, contact hello@brains.asia.',
+    ].join('\n'),
+  };
+}

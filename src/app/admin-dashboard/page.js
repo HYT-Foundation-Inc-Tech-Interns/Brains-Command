@@ -7,7 +7,7 @@ import {
   Settings, LogOut, Plus, Trash2, Mail, Eye, 
   CheckCircle, XCircle, Search, CreditCard, Filter, AlertTriangle,
   Server, Activity, Lock, Database, Power,
-  Megaphone, Send, Upload, Loader2
+  Megaphone, Send, Upload, Loader2, Download
 } from 'lucide-react';
 
 // --- Particle Network Background Component ---
@@ -926,6 +926,45 @@ export default function AdminDashboard() {
     return true;
   });
 
+  const exportCustomersCsv = () => {
+    if (displayedUsers.length === 0) return;
+
+    const columns = [
+      ['First Name', (u) => u.first_name],
+      ['Last Name', (u) => u.last_name],
+      ['Email', (u) => u.email],
+      ['Company', (u) => u.company],
+      ['Role', (u) => u.role],
+      ['Status', (u) => u.status || 'new'],
+      ['Subscribed Modules', (u) => (u.subscribed_modules || []).join('; ')],
+      ['Email Confirmed', (u) => (u.email_confirmed ? 'Yes' : 'No')],
+      ['Last Sign In', (u) => (u.last_sign_in ? new Date(u.last_sign_in).toLocaleString() : '')],
+      ['Created At', (u) => (u.created_at ? new Date(u.created_at).toLocaleString() : '')],
+    ];
+
+    const escapeCell = (value) => {
+      let text = value === null || value === undefined ? '' : String(value);
+      // Keep spreadsheet apps from evaluating a cell as a formula.
+      if (/^[=+\-@]/.test(text)) text = "'" + text;
+      return '"' + text.replace(/"/g, '""') + '"';
+    };
+
+    const lines = [
+      columns.map(([label]) => escapeCell(label)).join(','),
+      ...displayedUsers.map((user) => columns.map(([, read]) => escapeCell(read(user))).join(',')),
+    ];
+
+    const blob = new Blob(['\uFEFF', lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'customers-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const customerInquiryCount = inquiries.filter((inq) => inq.is_customer).length;
   const prospectInquiryCount = inquiries.length - customerInquiryCount;
 
@@ -1738,6 +1777,15 @@ export default function AdminDashboard() {
                         <option value="subscribed">Subscribed</option>
                         <option value="unsubscribed">Not Subscribed</option>
                       </select>
+
+                      <button
+                        onClick={exportCustomersCsv}
+                        disabled={displayedUsers.length === 0}
+                        title="Exports the current filtered view"
+                        className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-700/50 text-sm font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all active:scale-95 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Download className="w-4 h-4"/> Export CSV
+                      </button>
                     </>
                   )}
 
