@@ -9,7 +9,8 @@ import {
   Cpu, Radio, CreditCard, Users, PieChart, Handshake, 
   TrendingUp, ShoppingCart, Package, Wallet, Truck, 
   Navigation, KanbanSquare, Briefcase, MonitorSmartphone, ShoppingBag,
-  Facebook, Instagram, AlertTriangle, LogOut, Settings, User, Lock, Bell, Shield, Monitor, Smartphone, Trash2
+  Facebook, Instagram, AlertTriangle, LogOut, Settings, User, Lock, Bell, Shield, Monitor, Smartphone, Trash2,
+  Camera, Loader2, ZoomIn, ZoomOut, RotateCcw, X
 } from 'lucide-react';
 
 import { MyRequestsModule } from '@/components/modules/MyRequestsModule';
@@ -325,6 +326,9 @@ export default function UserDashboard() {
   // Account Settings State
   const [profileForm, setProfileForm] = useState({ first_name: '', last_name: '', company: '' });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef(null);
+  const [photoViewer, setPhotoViewer] = useState({ open: false, scale: 1 });
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -552,6 +556,102 @@ export default function UserDashboard() {
       setIsSavingProfile(false);
     }
   };
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow picking the same file again
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showNotification("Please choose an image file.", "error");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showNotification("Image must be 5MB or smaller.", "error");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id;
+      if (!userId) throw new Error('Not signed in');
+
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+      const path = `${userId}/avatar-${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { cacheControl: '3600', upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+
+      const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(path);
+      const avatarUrl = publicData.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', userId);
+      if (updateError) throw updateError;
+
+      setUserData(prev => ({ ...prev, avatar_url: avatarUrl }));
+      showNotification("Profile photo updated.", "success");
+    } catch (error) {
+      console.error("Avatar upload error:", error);
+      showNotification("Could not upload photo. Please try again.", "error");
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!userData?.id) return;
+    setIsUploadingAvatar(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: null })
+        .eq('id', userData.id);
+      if (error) throw error;
+
+      setUserData(prev => ({ ...prev, avatar_url: null }));
+      showNotification("Profile photo removed.", "success");
+    } catch (error) {
+      console.error("Avatar removal error:", error);
+      showNotification("Could not remove photo.", "error");
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const ZOOM_MIN = 1;
+  const ZOOM_MAX = 4;
+  const ZOOM_STEP = 0.25;
+
+  const openPhotoViewer = () => setPhotoViewer({ open: true, scale: 1 });
+  const closePhotoViewer = () => setPhotoViewer({ open: false, scale: 1 });
+  const zoomPhoto = (direction) =>
+    setPhotoViewer((prev) => ({
+      ...prev,
+      scale: Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Number((prev.scale + direction * ZOOM_STEP).toFixed(2)))),
+    }));
+
+  // Esc closes, +/- zoom while the photo viewer is open.
+  useEffect(() => {
+    if (!photoViewer.open) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setPhotoViewer({ open: false, scale: 1 });
+      if (e.key === '+' || e.key === '=') zoomPhoto(1);
+      if (e.key === '-') zoomPhoto(-1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [photoViewer.open]);
+
+  const userInitials =
+    `${userData?.first_name?.[0] || ''}${userData?.last_name?.[0] || ''}`.toUpperCase() ||
+    userData?.email?.[0]?.toUpperCase() ||
+    'U';
 
   // Resend cooldown ticker for the password verification step.
   useEffect(() => {
@@ -796,6 +896,17 @@ export default function UserDashboard() {
             <p className="text-[10px] md:text-xs text-indigo-400 font-mono hidden sm:block">{userData?.company || 'Independent'} • Operator Workspace</p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setActiveModule('account-settings')}
+              className="w-10 h-10 rounded-full overflow-hidden border border-indigo-700/60 hover:border-fuchsia-500/60 transition-colors shrink-0 bg-[#13172e]/80 flex items-center justify-center"
+              title="Account Settings"
+            >
+              {userData?.avatar_url ? (
+                <img src={userData.avatar_url} alt="Profile photo" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xs font-bold text-indigo-300">{userInitials}</span>
+              )}
+            </button>
             <button 
               onClick={() => setActiveModule('account-settings')} 
               className={`p-2 rounded-lg transition-colors ${activeModule === 'account-settings' ? 'bg-fuchsia-900/40 text-fuchsia-400 border border-fuchsia-500/50' : 'bg-[#13172e]/80 text-indigo-300 border border-indigo-700/50 hover:bg-[#1a1f3c]/80'}`}
@@ -975,7 +1086,51 @@ export default function UserDashboard() {
                         {/* Profile Settings */}
                         <form onSubmit={handleUpdateProfile} className="bg-[#13172e]/60 border border-indigo-800/50 rounded-xl p-6 shadow-lg flex flex-col">
                           <h4 className="text-sm font-bold text-indigo-300 uppercase tracking-widest mb-6 flex items-center gap-2"><User className="w-4 h-4"/> Personal Profile</h4>
-                          
+
+                          <div className="flex items-center gap-4 mb-6">
+                            <button
+                              type="button"
+                              onClick={openPhotoViewer}
+                              disabled={!userData?.avatar_url}
+                              title={userData?.avatar_url ? 'Click to view and zoom' : undefined}
+                              className="w-20 h-20 rounded-full overflow-hidden border border-indigo-700/60 bg-[#090b14] flex items-center justify-center shrink-0 transition-colors enabled:cursor-zoom-in enabled:hover:border-fuchsia-500/60 focus:outline-none focus:ring-1 focus:ring-fuchsia-500/50"
+                            >
+                              {userData?.avatar_url ? (
+                                <img src={userData.avatar_url} alt="Profile photo" className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-lg font-bold text-indigo-300">{userInitials}</span>
+                              )}
+                            </button>
+                            <div className="flex flex-col items-start gap-2">
+                              <input
+                                ref={avatarInputRef}
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/gif"
+                                onChange={handleAvatarUpload}
+                                className="hidden"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => avatarInputRef.current?.click()}
+                                disabled={isUploadingAvatar}
+                                className="flex items-center gap-2 bg-indigo-600/20 hover:bg-indigo-600 border border-indigo-500/50 text-indigo-200 hover:text-white text-xs font-bold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                              >
+                                {isUploadingAvatar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                                {isUploadingAvatar ? 'Uploading...' : (userData?.avatar_url ? 'Change Photo' : 'Upload Photo')}
+                              </button>
+                              {userData?.avatar_url && !isUploadingAvatar && (
+                                <button
+                                  type="button"
+                                  onClick={handleRemoveAvatar}
+                                  className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 hover:text-fuchsia-400 transition-colors"
+                                >
+                                  Remove photo
+                                </button>
+                              )}
+                              <p className="text-[10px] text-indigo-500/70">JPG, PNG or WebP. Max 5MB.</p>
+                            </div>
+                          </div>
+
                           <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                               <div>
@@ -1543,6 +1698,68 @@ export default function UserDashboard() {
                 {upgradeProcessing ? 'Processing...' : `Pay ${formatPHP(upgradeTotal)}`}
               </button>
               <button onClick={() => setShowUpgradeModal(false)} className="flex-1 bg-[#090b14] border border-indigo-700 text-indigo-200 font-bold py-3 rounded-lg hover:bg-[#13172e]">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Photo Viewer */}
+      {photoViewer.open && userData?.avatar_url && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-[#090b14]/90 backdrop-blur-sm cursor-pointer" onClick={closePhotoViewer}></div>
+
+          <div className="relative z-10 flex flex-col items-center gap-4">
+            <button
+              onClick={closePhotoViewer}
+              title="Close"
+              className="absolute -top-3 -right-3 z-20 p-2 rounded-full bg-[#13172e] border border-indigo-800/60 text-indigo-300 hover:text-white hover:border-fuchsia-500/60 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="w-[min(78vw,480px)] h-[min(78vw,480px)] rounded-2xl border border-indigo-800/50 bg-[#13172e]/60 overflow-hidden flex items-center justify-center">
+              <img
+                src={userData.avatar_url}
+                alt="Profile photo"
+                style={{ transform: `scale(${photoViewer.scale})` }}
+                className="w-full h-full object-contain transition-transform duration-200 ease-out select-none"
+                draggable={false}
+              />
+            </div>
+
+            <div className="flex items-center gap-1 bg-[#13172e] border border-indigo-800/50 rounded-full px-2 py-1.5 shadow-[0_0_25px_rgba(217,70,239,0.15)]">
+              <button
+                onClick={() => zoomPhoto(-1)}
+                disabled={photoViewer.scale <= ZOOM_MIN}
+                title="Zoom out"
+                className="p-2 rounded-full text-indigo-300 hover:text-white hover:bg-indigo-600/40 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+
+              <span className="w-14 text-center text-xs font-mono text-indigo-300 tabular-nums">
+                {Math.round(photoViewer.scale * 100)}%
+              </span>
+
+              <button
+                onClick={() => zoomPhoto(1)}
+                disabled={photoViewer.scale >= ZOOM_MAX}
+                title="Zoom in"
+                className="p-2 rounded-full text-indigo-300 hover:text-white hover:bg-indigo-600/40 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+
+              <div className="w-px h-5 bg-indigo-800/60 mx-1" />
+
+              <button
+                onClick={() => setPhotoViewer((prev) => ({ ...prev, scale: 1 }))}
+                disabled={photoViewer.scale === 1}
+                title="Reset zoom"
+                className="p-2 rounded-full text-indigo-300 hover:text-white hover:bg-indigo-600/40 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>

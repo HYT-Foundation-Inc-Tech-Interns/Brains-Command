@@ -7,7 +7,8 @@ import {
   Settings, LogOut, Plus, Trash2, Mail, Eye, 
   CheckCircle, XCircle, Search, CreditCard, Filter, AlertTriangle,
   Server, Activity, Lock, Database, Power,
-  Megaphone, Send, Upload, Loader2, Download
+  Megaphone, Send, Upload, Loader2, Download,
+  Camera, ZoomIn, ZoomOut, RotateCcw, X, User
 } from 'lucide-react';
 
 // --- Particle Network Background Component ---
@@ -207,6 +208,13 @@ export default function AdminDashboard() {
   const [gateMessage, setGateMessage] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
 
+  // Administrator profile photo
+  const [adminProfile, setAdminProfile] = useState({ first_name: '', last_name: '', avatar_url: null });
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarStatus, setAvatarStatus] = useState({ type: '', message: '' });
+  const [photoViewer, setPhotoViewer] = useState({ open: false, scale: 1, src: null });
+  const avatarInputRef = useRef(null);
+
   // Email campaigns
   const [campaignDraft, setCampaignDraft] = useState({ subject: '', body: '', images: [] });
   const [campaignAudience, setCampaignAudience] = useState('customers'); // customers | prospects | all | custom
@@ -236,11 +244,17 @@ export default function AdminDashboard() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, first_name, last_name, avatar_url')
         .eq('id', session.user.id)
         .single();
 
       if (cancelled) return;
+
+      setAdminProfile({
+        first_name: profile?.first_name || '',
+        last_name: profile?.last_name || '',
+        avatar_url: profile?.avatar_url || null,
+      });
 
       if (profile?.role !== 'admin') {
         setGateMessage('This account does not have administrator access.');
@@ -285,6 +299,104 @@ export default function AdminDashboard() {
       setGate('ready');
     } catch (err) {
       setGateMessage('Connection error. Please try again.');
+    }
+  };
+
+  // --- Administrator profile photo ---
+  const ZOOM_MIN = 1;
+  const ZOOM_MAX = 4;
+  const ZOOM_STEP = 0.25;
+
+  const adminInitials =
+    `${adminProfile.first_name?.[0] || ''}${adminProfile.last_name?.[0] || ''}`.toUpperCase() ||
+    adminEmail?.[0]?.toUpperCase() ||
+    'A';
+
+  const openPhotoViewer = (src) => setPhotoViewer({ open: true, scale: 1, src });
+  const closePhotoViewer = () => setPhotoViewer({ open: false, scale: 1, src: null });
+  const zoomPhoto = (direction) =>
+    setPhotoViewer((prev) => ({
+      ...prev,
+      scale: Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Number((prev.scale + direction * ZOOM_STEP).toFixed(2)))),
+    }));
+
+  useEffect(() => {
+    if (!photoViewer.open) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setPhotoViewer({ open: false, scale: 1, src: null });
+      if (e.key === '+' || e.key === '=') zoomPhoto(1);
+      if (e.key === '-') zoomPhoto(-1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [photoViewer.open]);
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setAvatarStatus({ type: 'error', message: 'Please choose an image file.' });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarStatus({ type: 'error', message: 'Image must be 5MB or smaller.' });
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setAvatarStatus({ type: '', message: '' });
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id;
+      if (!userId) throw new Error('Not signed in');
+
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+      const path = `${userId}/avatar-${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { cacheControl: '3600', upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+
+      const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(path);
+      const avatarUrl = publicData.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', userId);
+      if (updateError) throw updateError;
+
+      setAdminProfile((prev) => ({ ...prev, avatar_url: avatarUrl }));
+      setAvatarStatus({ type: 'success', message: 'Profile photo updated.' });
+    } catch (error) {
+      console.error('Avatar upload error:', error);
+      setAvatarStatus({ type: 'error', message: 'Could not upload photo. Please try again.' });
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setIsUploadingAvatar(true);
+    setAvatarStatus({ type: '', message: '' });
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id;
+      if (!userId) throw new Error('Not signed in');
+
+      const { error } = await supabase.from('profiles').update({ avatar_url: null }).eq('id', userId);
+      if (error) throw error;
+
+      setAdminProfile((prev) => ({ ...prev, avatar_url: null }));
+      setAvatarStatus({ type: 'success', message: 'Profile photo removed.' });
+    } catch (error) {
+      console.error('Avatar removal error:', error);
+      setAvatarStatus({ type: 'error', message: 'Could not remove photo.' });
+    } finally {
+      setIsUploadingAvatar(false);
     }
   };
 
@@ -1141,6 +1253,17 @@ export default function AdminDashboard() {
             <p className="text-xs text-indigo-400 font-mono hidden sm:block">Access Level: Tier 1 Security</p>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => setActiveTab('settings')}
+              title="Admin profile photo"
+              className="w-10 h-10 rounded-full overflow-hidden border border-indigo-700/60 hover:border-fuchsia-500/60 transition-colors shrink-0 bg-[#13172e]/80 flex items-center justify-center"
+            >
+              {adminProfile.avatar_url ? (
+                <img src={adminProfile.avatar_url} alt="Admin profile photo" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xs font-bold text-indigo-300">{adminInitials}</span>
+              )}
+            </button>
             <div className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
             <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">System Online</span>
           </div>
@@ -1193,7 +1316,76 @@ export default function AdminDashboard() {
               
               {/* Left Column: Platform Controls & Health */}
               <div className="lg:col-span-1 space-y-8">
-                
+
+                {/* Administrator Profile Photo */}
+                <div className="bg-[#13172e]/80 backdrop-blur-md border border-indigo-800/50 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[50px] pointer-events-none"></div>
+
+                  <h3 className="text-sm font-bold text-indigo-300 uppercase tracking-widest mb-1 flex items-center gap-2 relative z-10">
+                    <User className="w-4 h-4 text-indigo-400" /> Administrator Profile
+                  </h3>
+                  <p className="text-[11px] text-indigo-400/80 mb-5 relative z-10">
+                    This photo appears in the header of your command deck.
+                  </p>
+
+                  <div className="flex items-center gap-4 relative z-10">
+                    <button
+                      type="button"
+                      onClick={() => openPhotoViewer(adminProfile.avatar_url)}
+                      disabled={!adminProfile.avatar_url}
+                      title={adminProfile.avatar_url ? 'Click to view and zoom' : undefined}
+                      className="w-20 h-20 rounded-full overflow-hidden border border-indigo-700/60 bg-[#090b14] flex items-center justify-center shrink-0 transition-colors enabled:cursor-zoom-in enabled:hover:border-fuchsia-500/60 focus:outline-none focus:ring-1 focus:ring-fuchsia-500/50"
+                    >
+                      {adminProfile.avatar_url ? (
+                        <img src={adminProfile.avatar_url} alt="Admin profile photo" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-lg font-bold text-indigo-300">{adminInitials}</span>
+                      )}
+                    </button>
+
+                    <div className="flex flex-col items-start gap-2 min-w-0">
+                      <p className="text-sm font-bold text-white truncate w-full">
+                        {[adminProfile.first_name, adminProfile.last_name].filter(Boolean).join(' ') || 'Administrator'}
+                      </p>
+                      <p className="text-[11px] text-indigo-400/80 font-mono truncate w-full">{adminEmail}</p>
+
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        onChange={handleAvatarUpload}
+                        className="hidden"
+                      />
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => avatarInputRef.current?.click()}
+                          disabled={isUploadingAvatar}
+                          className="flex items-center gap-2 bg-fuchsia-600/20 hover:bg-fuchsia-600 border border-fuchsia-500/50 text-fuchsia-200 hover:text-white text-xs font-bold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {isUploadingAvatar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                          {isUploadingAvatar ? 'Uploading...' : (adminProfile.avatar_url ? 'Change Photo' : 'Upload Photo')}
+                        </button>
+                        {adminProfile.avatar_url && !isUploadingAvatar && (
+                          <button
+                            type="button"
+                            onClick={handleRemoveAvatar}
+                            className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 hover:text-fuchsia-400 transition-colors"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {avatarStatus.message && (
+                    <div className={`mt-4 text-[11px] font-semibold rounded-lg px-3 py-2 border relative z-10 ${avatarStatus.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                      {avatarStatus.message}
+                    </div>
+                  )}
+                </div>
+
                 {/* Account Security: change temporary password */}
                 <div className="bg-[#13172e]/80 backdrop-blur-md border border-indigo-800/50 rounded-2xl p-6 shadow-xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/10 rounded-full blur-[50px] pointer-events-none"></div>
@@ -1870,8 +2062,28 @@ export default function AdminDashboard() {
                     {['admins', 'customers'].includes(activeTab) && displayedUsers.map((user) => (
                       <tr key={user.id} className="hover:bg-indigo-900/20 transition-colors">
                         <td className="px-6 py-5 whitespace-nowrap">
-                          <div className="text-sm font-bold text-white">{user.first_name} {user.last_name}</div>
-                          <div className="text-xs text-indigo-400/70 font-mono mt-1">ID: {user.id.substring(0, 8)}...</div>
+                          <div className="flex items-center gap-3">
+                            {user.avatar_url ? (
+                              <button
+                                type="button"
+                                onClick={() => openPhotoViewer(user.avatar_url)}
+                                title="Click to view and zoom"
+                                className="w-10 h-10 rounded-full overflow-hidden border border-indigo-700/60 hover:border-fuchsia-500/60 cursor-zoom-in transition-colors shrink-0 focus:outline-none focus:ring-1 focus:ring-fuchsia-500/50"
+                              >
+                                <img src={user.avatar_url} alt={`${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Profile photo'} className="w-full h-full object-cover" />
+                              </button>
+                            ) : (
+                              <div className="w-10 h-10 rounded-full border border-indigo-800/60 bg-[#090b14] flex items-center justify-center shrink-0">
+                                <span className="text-[10px] font-bold text-indigo-400">
+                                  {(`${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase() || user.email?.[0]?.toUpperCase() || '?')}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <div className="text-sm font-bold text-white">{user.first_name} {user.last_name}</div>
+                              <div className="text-xs text-indigo-400/70 font-mono mt-1">ID: {user.id.substring(0, 8)}...</div>
+                            </div>
+                          </div>
                         </td>
                         <td className="px-6 py-5 whitespace-nowrap">
                           <div className="text-sm text-indigo-200 flex items-center gap-2">
@@ -2348,6 +2560,68 @@ export default function AdminDashboard() {
             <div className="flex gap-4 justify-center">
               <button onClick={confirmAndDeleteUser} disabled={processingId === userToDelete.id} className="flex-1 bg-red-600 text-white font-bold py-2 rounded-lg">{processingId === userToDelete.id ? '...' : 'Delete'}</button>
               <button onClick={() => setUserToDelete(null)} className="flex-1 bg-[#090b14] border border-indigo-700 text-indigo-200 font-bold py-2 rounded-lg">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Photo Viewer */}
+      {photoViewer.open && photoViewer.src && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-[#090b14]/90 backdrop-blur-sm cursor-pointer" onClick={closePhotoViewer}></div>
+
+          <div className="relative z-10 flex flex-col items-center gap-4">
+            <button
+              onClick={closePhotoViewer}
+              title="Close"
+              className="absolute -top-3 -right-3 z-20 p-2 rounded-full bg-[#13172e] border border-indigo-800/60 text-indigo-300 hover:text-white hover:border-fuchsia-500/60 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="w-[min(78vw,480px)] h-[min(78vw,480px)] rounded-2xl border border-indigo-800/50 bg-[#13172e]/60 overflow-hidden flex items-center justify-center">
+              <img
+                src={photoViewer.src}
+                alt="Profile photo"
+                style={{ transform: `scale(${photoViewer.scale})` }}
+                className="w-full h-full object-contain transition-transform duration-200 ease-out select-none"
+                draggable={false}
+              />
+            </div>
+
+            <div className="flex items-center gap-1 bg-[#13172e] border border-indigo-800/50 rounded-full px-2 py-1.5 shadow-[0_0_25px_rgba(217,70,239,0.15)]">
+              <button
+                onClick={() => zoomPhoto(-1)}
+                disabled={photoViewer.scale <= ZOOM_MIN}
+                title="Zoom out"
+                className="p-2 rounded-full text-indigo-300 hover:text-white hover:bg-indigo-600/40 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+
+              <span className="w-14 text-center text-xs font-mono text-indigo-300 tabular-nums">
+                {Math.round(photoViewer.scale * 100)}%
+              </span>
+
+              <button
+                onClick={() => zoomPhoto(1)}
+                disabled={photoViewer.scale >= ZOOM_MAX}
+                title="Zoom in"
+                className="p-2 rounded-full text-indigo-300 hover:text-white hover:bg-indigo-600/40 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+
+              <div className="w-px h-5 bg-indigo-800/60 mx-1" />
+
+              <button
+                onClick={() => setPhotoViewer((prev) => ({ ...prev, scale: 1 }))}
+                disabled={photoViewer.scale === 1}
+                title="Reset zoom"
+                className="p-2 rounded-full text-indigo-300 hover:text-white hover:bg-indigo-600/40 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
