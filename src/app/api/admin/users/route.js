@@ -59,7 +59,7 @@ export async function GET(req) {
     const { data: profiles, error } = await supabaseAdmin
       .from('profiles')
       .select(`
-        id, first_name, last_name, email, company, role, created_at, updated_at, status,
+        id, first_name, last_name, email, company, role, created_at, updated_at, status, avatar_url,
         user_subscriptions ( module_id, status ) 
       `)
       .order('created_at', { ascending: false });

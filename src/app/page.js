@@ -8,7 +8,8 @@ import {
   Users, PieChart, Handshake, TrendingUp, ShoppingCart, 
   Package, Wallet, Truck, Navigation, KanbanSquare,
   Phone, Mail, MapPin,
-  Building2, Landmark, ClipboardCheck, Cpu, Radio // <-- Added these 5
+  Building2, Landmark, ClipboardCheck, Cpu, Radio, // <-- Added these 5
+  Eye, EyeOff
 } from 'lucide-react';
 
 // --- Sign In & Forgot Password Pop-up Modal Component ---
@@ -16,6 +17,7 @@ const SignInModal = ({ onClose }) => {
   const [view, setView] = useState("login");
   const [message, setMessage] = useState("");
   const [resetEmail, setResetEmail] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -214,7 +216,25 @@ const SignInModal = ({ onClose }) => {
                   Forgot password?
                 </button>
               </div>
-              <input name="password" type="password" required className="w-full bg-[#090b14] border border-indigo-800/50 rounded-lg px-4 py-3 text-white placeholder-indigo-500/50 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/50 transition-colors" placeholder="••••••••" />
+              <div className="relative">
+                <input
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  autoComplete="current-password"
+                  className="w-full bg-[#090b14] border border-indigo-800/50 rounded-lg pl-4 pr-12 py-3 text-white placeholder-indigo-500/50 focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/50 transition-colors"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-indigo-400 hover:text-fuchsia-400 transition-colors focus:outline-none"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
             
             <button type="submit" className="w-full bg-gradient-to-r from-fuchsia-600 to-blue-600 hover:from-fuchsia-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-lg mt-6 transition-all duration-300 shadow-[0_4px_14px_rgba(217,70,239,0.25)] active:scale-95">
