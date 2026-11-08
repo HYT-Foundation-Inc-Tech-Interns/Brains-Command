@@ -5,8 +5,15 @@
 --    whether the role may touch the table at all. Without them every UPDATE from
 --    the browser fails with 42501 "permission denied for table profiles".
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
-GRANT SELECT, INSERT, UPDATE ON public.profiles TO authenticated;
+GRANT SELECT, INSERT ON public.profiles TO authenticated;
 GRANT SELECT ON public.profiles TO anon;
+
+-- Column-scoped UPDATE only. A blanket GRANT UPDATE would let any signed-in
+-- customer write role = 'admin' from the browser console, which is exactly what
+-- supabase-admin-verification.sql closes off.
+REVOKE UPDATE ON public.profiles FROM authenticated;
+GRANT UPDATE (first_name, last_name, company, avatar_url, updated_at)
+  ON public.profiles TO authenticated;
 
 -- 1. Store the public URL of the uploaded photo on the profile row
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;

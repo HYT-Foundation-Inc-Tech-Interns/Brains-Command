@@ -1,60 +1,124 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
-import nodemailer from 'nodemailer';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { sendMail } from '@/lib/mailer';
+import { trialApprovedEmail, trialRejectedEmail } from '@/lib/emailTemplates';
 
-// THIS LINE IS CRITICAL: It must be exactly 'export async function POST'
 export async function POST(req) {
   try {
-    const { userId, email, action, name } = await req.json();
+    const body = await req.json();
+    const { 
+      userId, 
+      email, 
+      action, 
+      name, 
+      modules = ['hms', 'pms', 'hvms', 'bms', 'iot'], 
+      trialDays = 14,
+      reason = '',
+      adminNote = ''
+    } = body;
 
-    // 1. Update the user's status in Supabase
+    if (!userId || !email || !action) {
+      return NextResponse.json({ message: "Missing required parameters (userId, email, action)." }, { status: 400 });
+    }
+
     const newStatus = action === 'approve' ? 'active' : 'rejected';
-    const { error: dbError } = await supabase
+
+    // 1. Update the user's status in Supabase profiles
+    const { error: dbError } = await supabaseAdmin
       .from('profiles')
-      .update({ status: newStatus })
+      .update({ 
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', userId);
 
-    if (dbError) throw dbError;
+    if (dbError) {
+      console.error('Database update error on profiles:', dbError);
+      throw dbError;
+    }
 
-    // 2. Configure the Email Sender
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER, 
-        pass: process.env.EMAIL_PASS, 
-      },
-    });
+    // 2. If approved, unlock the requested/default modules in user_subscriptions
+    if (action === 'approve') {
+      const activeModules = modules && modules.length > 0
+        ? modules
+        : ['hms', 'pms', 'hvms', 'bms', 'iot'];
 
-    // 3. Craft the Email Content based on the action
-    const subject = action === 'approve' 
-      ? 'Central Command: Trial Request Approved!' 
-      : 'Central Command: Trial Request Update';
+      const subscriptionInserts = activeModules.map(moduleId => ({
+        user_id: userId,
+        module_id: moduleId,
+        status: 'active',
+        created_at: new Date().toISOString()
+      }));
 
-    const htmlContent = action === 'approve'
-      ? `<div style="font-family: sans-serif; color: #333;">
-          <h2 style="color: #4f46e5;">Access Granted</h2>
-          <p>Hello ${name},</p>
-          <p>Your 14-day free trial for Central Command has been approved! You can now log in to your dashboard.</p>
-          <a href="http://localhost:3000/" style="background: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Sign In Now</a>
-         </div>`
-      : `<div style="font-family: sans-serif; color: #333;">
-          <h2 style="color: #ef4444;">Request Update</h2>
-          <p>Hello ${name},</p>
-          <p>Unfortunately, we are unable to approve your trial request at this time. Please contact sales for more information.</p>
-         </div>`;
+      const { error: subError } = await supabaseAdmin
+        .from('user_subscriptions')
+        .upsert(subscriptionInserts, { onConflict: 'user_id, module_id' });
 
-    // 4. Send the Email
-    await transporter.sendMail({
-      from: `"Central Command" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: subject,
-      html: htmlContent,
-    });
+      if (subError) {
+        console.error('Failed to upsert user_subscriptions:', subError);
+        // We log it, but proceed with email notification
+      }
 
-    return NextResponse.json({ message: `User ${action}d successfully and email sent.` }, { status: 200 });
+      // 3. Dispatch the branded trial approval email
+      try {
+        const mailData = trialApprovedEmail({
+          firstName: name,
+          email,
+          modules: activeModules,
+          trialDays: Number(trialDays) || 14,
+          adminNote
+        });
+
+        await sendMail({
+          to: email,
+          ...mailData,
+        });
+      } catch (mailError) {
+        console.warn('Mail notification warning (approval already committed):', mailError.message);
+      }
+
+      return NextResponse.json({ 
+        success: true,
+        message: `Trial approved successfully. ${activeModules.length} modules unlocked and notification email dispatched.`,
+        unlockedModules: activeModules
+      }, { status: 200 });
+
+    } else {
+      // Action is 'reject'
+      // Optionally deactivate any pending subscriptions
+      await supabaseAdmin
+        .from('user_subscriptions')
+        .update({ status: 'canceled' })
+        .eq('user_id', userId);
+
+      // Dispatch rejection notification email
+      try {
+        const mailData = trialRejectedEmail({
+          firstName: name,
+          email,
+          reason
+        });
+
+        await sendMail({
+          to: email,
+          ...mailData,
+        });
+      } catch (mailError) {
+        console.warn('Mail notification warning (rejection already committed):', mailError.message);
+      }
+
+      return NextResponse.json({ 
+        success: true,
+        message: 'Trial request rejected and customer notified via email.' 
+      }, { status: 200 });
+    }
 
   } catch (error) {
-    console.error('Action error:', error);
-    return NextResponse.json({ message: "Failed to process request.", error: error.message }, { status: 500 });
+    console.error('Trial action API error:', error);
+    return NextResponse.json({ 
+      success: false,
+      message: "Failed to process trial request.", 
+      error: error.message 
+    }, { status: 500 });
   }
 }

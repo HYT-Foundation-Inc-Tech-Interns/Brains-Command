@@ -10,8 +10,11 @@ import {
   TrendingUp, ShoppingCart, Package, Wallet, Truck, 
   Navigation, KanbanSquare, Briefcase, MonitorSmartphone, ShoppingBag,
   Facebook, Instagram, AlertTriangle, LogOut, Settings, User, Lock, Bell, Shield, Monitor, Smartphone, Trash2,
-  Camera, Loader2, ZoomIn, ZoomOut, RotateCcw, X
+  Camera, Loader2, ZoomIn, ZoomOut, RotateCcw, X, Sparkles, CheckCircle2, ArrowRight
 } from 'lucide-react';
+
+import SciFiTelemetryHUD from '@/components/animations/SciFiTelemetryHUD';
+import Card3DTilt from '@/components/animations/Card3DTilt';
 
 import { MyRequestsModule } from '@/components/modules/MyRequestsModule';
 import { ConnectorModule } from '@/components/modules/ConnectorModule';
@@ -186,7 +189,7 @@ const subsidiaryBrands = [
   { 
     name: "Luxurious Cleaning Co.", image: "/logos/luxurious-logo.png", icon: "✨", 
     desc: "Top-tier general, deep, and post-construction cleaning services.",
-    links: { facebook: "https://facebook.com/luxuriouscleaningph" }
+    links: { facebook: "https://facebook.com/luxuriouscleaningph", website: "https://connectorcore.com/Luxurious-Cleaning-Website-master/" }
   },
   { 
     name: "The Soap Republic", image: "/logos/soap-republic-logo.png", icon: "🧼", 
@@ -201,12 +204,12 @@ const subsidiaryBrands = [
   { 
     name: "Green Oasis", image: "/logos/green-oasis-logo.png", icon: "🌿", 
     desc: "Landscape design, interior biophilic installations, and garden maintenance.",
-    links: { website: "https://thegreenoasis.ph" }
+    links: { website: "https://connectorcore.com/The-Green-Oasis-Website-master/" }
   },
   { 
     name: "The Finest Fit", image: "/logos/finest-fit-logo.png", icon: "👕", 
     desc: "High-quality customized uniforms, corporate apparel, and printing.",
-    links: { website: "https://thefinestfit.com" }
+    links: { website: "https://connectorcore.com/The-Finest-Fit-Website-master/" }
   },
   { 
     name: "Portress", image: "/logos/portress-logo.png", icon: "🚢", 
@@ -921,7 +924,11 @@ export default function UserDashboard() {
         </header>
 
         {/* Content Wrapper */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 connector-scrollbar bg-transparent">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 connector-scrollbar bg-transparent space-y-6">
+          
+          {/* High-Tech Cockpit Telemetry Strip (Pinterest Ref 3) */}
+          <SciFiTelemetryHUD systemName="Brains Operator Cockpit" userRole={userData?.role || 'Operator'} />
+
           <div className="max-w-[1600px] mx-auto h-full flex flex-col">
             
             {/* Maintenance Intercept */}
@@ -946,7 +953,7 @@ export default function UserDashboard() {
                 
                 {/* OVERVIEW MODULE */}
                 {activeModule === 'overview' && (
-                  <div className="h-full flex flex-col gap-4 md:gap-6 w-full animate-fadeIn">
+                  <div className="h-full flex flex-col gap-6 w-full animate-fadeIn">
                     <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-indigo-800/50 pb-4 gap-4 w-full">
                       <div>
                         <h3 className="text-base md:text-xl font-bold text-white flex items-center gap-2">
@@ -962,29 +969,81 @@ export default function UserDashboard() {
                         </div>
                         <button 
                           onClick={() => setShowUpgradeModal(true)} 
-                          className="bg-gradient-to-r from-fuchsia-600 to-blue-600 hover:from-fuchsia-500 hover:to-blue-500 text-white text-[10px] md:text-xs font-bold py-1.5 md:py-2 px-4 rounded-full transition-all shadow-[0_0_15px_rgba(217,70,239,0.3)] active:scale-95 whitespace-nowrap"
+                          className="bg-gradient-to-r from-fuchsia-600 to-blue-600 hover:from-fuchsia-500 hover:to-blue-500 text-white text-[10px] md:text-xs font-bold py-1.5 md:py-2 px-4 rounded-full transition-all shadow-[0_0_15px_rgba(217,70,239,0.3)] active:scale-95 whitespace-nowrap cursor-pointer"
                         >
                           + Upgrade SaaS Modules
                         </button>
                       </div>
                     </div>
 
+                    {/* 3D KPI Bento Cards */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 w-full">
-                      <div className="bg-[#090b14]/60 border border-indigo-800/50 rounded-xl p-3 md:p-5 shadow-lg">
-                        <div className="text-[9px] md:text-xs text-indigo-400 font-bold mb-1 md:mb-2 tracking-wider truncate">ACTIVE MODULES</div>
-                        <div className="text-xl md:text-3xl text-white font-bold">{userData?.subscribed_modules?.length || 0}</div>
+                      <Card3DTilt maxTilt={8}>
+                        <div className="p-4 md:p-5">
+                          <div className="text-[9px] md:text-xs text-indigo-400 font-bold mb-1 md:mb-2 tracking-wider truncate font-mono">ACTIVE MODULES</div>
+                          <div className="text-xl md:text-3xl text-white font-black">{userData?.subscribed_modules?.length || 0}</div>
+                        </div>
+                      </Card3DTilt>
+                      <Card3DTilt maxTilt={8}>
+                        <div className="p-4 md:p-5">
+                          <div className="text-[9px] md:text-xs text-indigo-400 font-bold mb-1 md:mb-2 tracking-wider truncate font-mono">NETWORK UPTIME</div>
+                          <div className="text-xl md:text-3xl text-emerald-400 font-black drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]">99.9%</div>
+                        </div>
+                      </Card3DTilt>
+                      <Card3DTilt maxTilt={8}>
+                        <div className="p-4 md:p-5">
+                          <div className="text-[9px] md:text-xs text-indigo-400 font-bold mb-1 md:mb-2 tracking-wider truncate font-mono">DATA BUS PING</div>
+                          <div className="text-xl md:text-3xl text-cyan-400 font-black drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]">&lt; 14ms</div>
+                        </div>
+                      </Card3DTilt>
+                      <Card3DTilt maxTilt={8}>
+                        <div className="p-4 md:p-5">
+                          <div className="text-[9px] md:text-xs text-indigo-400 font-bold mb-1 md:mb-2 tracking-wider truncate font-mono">SECURITY RATING</div>
+                          <div className="text-xl md:text-3xl text-blue-400 font-black drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]">A+</div>
+                        </div>
+                      </Card3DTilt>
+                    </div>
+
+                    {/* 3D Module Quick Launcher (Pinterest Ref 1 & 2) */}
+                    <div className="w-full">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-xs font-mono font-bold text-indigo-300 uppercase tracking-widest">
+                          Core Enterprise Suites // Interactive Launcher
+                        </h4>
+                        <span className="text-[10px] text-fuchsia-400 font-mono">Click to launch module</span>
                       </div>
-                      <div className="bg-[#090b14]/60 border border-indigo-800/50 rounded-xl p-3 md:p-5 shadow-lg">
-                        <div className="text-[9px] md:text-xs text-indigo-400 font-bold mb-1 md:mb-2 tracking-wider truncate">NETWORK UPTIME</div>
-                        <div className="text-xl md:text-3xl text-emerald-400 font-bold drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]">99.9%</div>
-                      </div>
-                      <div className="bg-[#090b14]/60 border border-indigo-800/50 rounded-xl p-3 md:p-5 shadow-lg">
-                        <div className="text-[9px] md:text-xs text-indigo-400 font-bold mb-1 md:mb-2 tracking-wider truncate">OPEN ALERTS</div>
-                        <div className="text-xl md:text-3xl text-amber-400 font-bold drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]">3</div>
-                      </div>
-                      <div className="bg-[#090b14]/60 border border-indigo-800/50 rounded-xl p-3 md:p-5 shadow-lg">
-                        <div className="text-[9px] md:text-xs text-indigo-400 font-bold mb-1 md:mb-2 tracking-wider truncate">SECURITY RATING</div>
-                        <div className="text-xl md:text-3xl text-blue-400 font-bold drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]">A+</div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+                        {[
+                          { id: 'hms', code: 'HMS', name: 'Frontdesk', desc: 'Hotel & Reservations', icon: Building2, color: 'text-fuchsia-400', border: 'border-fuchsia-500/30' },
+                          { id: 'pms', code: 'PMS', name: 'Landlord', desc: 'Property & Tenants', icon: Landmark, color: 'text-blue-400', border: 'border-blue-500/30' },
+                          { id: 'hvms', code: 'HVMS', name: 'Butler', desc: 'Visitor QR Passes', icon: ClipboardCheck, color: 'text-emerald-400', border: 'border-emerald-500/30' },
+                          { id: 'bms', code: 'BMS', name: 'Sekyu', desc: 'Building Operations', icon: Cpu, color: 'text-amber-400', border: 'border-amber-500/30' },
+                          { id: 'iot', code: 'IoT', name: 'Housekeeper', desc: 'Sensor Telemetry', icon: Radio, color: 'text-cyan-400', border: 'border-cyan-500/30' },
+                        ].map((suite) => {
+                          const isSubscribed = userData?.subscribed_modules?.includes(suite.id);
+                          const Icon = suite.icon;
+                          return (
+                            <Card3DTilt
+                              key={suite.id}
+                              maxTilt={10}
+                              active={activeModule === suite.id}
+                              onClick={() => isSubscribed && setActiveModule(suite.id)}
+                              className={`p-4 transition-all ${isSubscribed ? 'cursor-pointer hover:border-indigo-400' : 'opacity-60 cursor-not-allowed'}`}
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <div className={`p-2 rounded-xl bg-indigo-950/70 ${suite.color}`}>
+                                  <Icon className="w-4 h-4" />
+                                </div>
+                                <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border ${isSubscribed ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' : 'text-indigo-400/50 border-indigo-800/40'}`}>
+                                  {isSubscribed ? 'ACTIVE' : 'LOCKED'}
+                                </span>
+                              </div>
+                              <div className="text-xs font-bold text-white mb-0.5">{suite.name}</div>
+                              <div className="text-[10px] text-indigo-300/70 line-clamp-1">{suite.desc}</div>
+                            </Card3DTilt>
+                          );
+                        })}
                       </div>
                     </div>
 

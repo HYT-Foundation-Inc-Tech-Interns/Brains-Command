@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { 
   LayoutDashboard, Users, ShieldAlert, MessageSquare, 
@@ -8,8 +9,12 @@ import {
   CheckCircle, XCircle, Search, CreditCard, Filter, AlertTriangle,
   Server, Activity, Lock, Database, Power,
   Megaphone, Send, Upload, Loader2, Download,
-  Camera, ZoomIn, ZoomOut, RotateCcw, X, User
+  Camera, ZoomIn, ZoomOut, RotateCcw, X, User,
+  Sparkles, CheckCircle2, ArrowUpRight, Cpu
 } from 'lucide-react';
+
+import SciFiTelemetryHUD from '@/components/animations/SciFiTelemetryHUD';
+import Card3DTilt from '@/components/animations/Card3DTilt';
 
 // --- Particle Network Background Component ---
 const ParticleBackground = () => {
@@ -1269,44 +1274,104 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 connector-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 connector-scrollbar space-y-6">
           
+          {/* High-Tech Sci-Fi Cockpit Telemetry Strip (Pinterest Ref 3) */}
+          <SciFiTelemetryHUD systemName="Central Command Admin Cockpit" userRole="Master Administrator" />
+
           {/* OVERVIEW TAB */}
           {activeTab === 'overview' && (
-            <div className="animate-fadeIn max-w-[1600px] mx-auto">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-[#13172e]/80 backdrop-blur-md rounded-2xl border border-fuchsia-500/30 shadow-[0_8px_30px_rgba(0,0,0,0.5)] p-6 flex items-center justify-between hover:border-fuchsia-500 transition-colors cursor-pointer" onClick={() => setActiveTab('admins')}>
-                  <div>
-                    <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-wide mb-2">Total Admins</h3>
-                    <p className="text-4xl font-black text-fuchsia-400">{users.filter(u => u.role === 'admin').length}</p>
+            <div className="animate-fadeIn max-w-[1600px] mx-auto space-y-8">
+              {/* 3D KPI Bento Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card3DTilt maxTilt={8} active={false} onClick={() => setActiveTab('admins')}>
+                  <div className="p-6 flex items-center justify-between cursor-pointer">
+                    <div>
+                      <h3 className="text-xs font-mono font-bold text-indigo-300 uppercase tracking-wider mb-2">Total Admins</h3>
+                      <p className="text-4xl font-black text-fuchsia-400">{users.filter(u => u.role === 'admin').length}</p>
+                      <span className="text-[11px] font-mono text-fuchsia-300/80 mt-1 inline-flex items-center gap-1">
+                        Active security clearance <ArrowUpRight className="w-3 h-3" />
+                      </span>
+                    </div>
+                    <div className="w-16 h-16 rounded-2xl bg-fuchsia-500/10 border border-fuchsia-500/30 flex items-center justify-center text-fuchsia-400 shadow-[0_0_15px_rgba(217,70,239,0.2)]">
+                      <ShieldAlert className="w-8 h-8" strokeWidth={1.5}/>
+                    </div>
                   </div>
-                  <div className="w-16 h-16 rounded-2xl bg-fuchsia-500/10 border border-fuchsia-500/20 flex items-center justify-center text-fuchsia-400"><ShieldAlert className="w-8 h-8" strokeWidth={1.5}/></div>
-                </div>
+                </Card3DTilt>
                 
-                <div className="bg-[#13172e]/80 backdrop-blur-md rounded-2xl border border-blue-500/30 shadow-[0_8px_30px_rgba(0,0,0,0.5)] p-6 flex items-center justify-between hover:border-blue-500 transition-colors cursor-pointer" onClick={() => setActiveTab('customers')}>
-                  <div>
-                    <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-wide mb-2">Active Customers</h3>
-                    <p className="text-4xl font-black text-blue-400">{users.filter(u => u.role === 'customer').length}</p>
+                <Card3DTilt maxTilt={8} active={false} onClick={() => setActiveTab('customers')}>
+                  <div className="p-6 flex items-center justify-between cursor-pointer">
+                    <div>
+                      <h3 className="text-xs font-mono font-bold text-indigo-300 uppercase tracking-wider mb-2">Active Customers</h3>
+                      <p className="text-4xl font-black text-blue-400">{users.filter(u => u.role === 'customer').length}</p>
+                      <span className="text-[11px] font-mono text-blue-300/80 mt-1 inline-flex items-center gap-1">
+                        Subscribed organizations <ArrowUpRight className="w-3 h-3" />
+                      </span>
+                    </div>
+                    <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                      <Users className="w-8 h-8" strokeWidth={1.5}/>
+                    </div>
                   </div>
-                  <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400"><Users className="w-8 h-8" strokeWidth={1.5}/></div>
-                </div>
+                </Card3DTilt>
 
-                <div className="bg-[#13172e]/80 backdrop-blur-md rounded-2xl border border-emerald-500/30 shadow-[0_8px_30px_rgba(0,0,0,0.5)] p-6 flex items-center justify-between hover:border-emerald-500 transition-colors cursor-pointer" onClick={() => setActiveTab('inquiries')}>
-                  <div>
-                    <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-wide mb-2">Pending Inquiries</h3>
-                    <p className="text-4xl font-black text-emerald-400">{inquiries.filter(i => i.status === 'Pending').length}</p>
+                <Card3DTilt maxTilt={8} active={false} onClick={() => setActiveTab('inquiries')}>
+                  <div className="p-6 flex items-center justify-between cursor-pointer">
+                    <div>
+                      <h3 className="text-xs font-mono font-bold text-indigo-300 uppercase tracking-wider mb-2">Pending Inquiries</h3>
+                      <p className="text-4xl font-black text-emerald-400">{inquiries.filter(i => i.status === 'Pending').length}</p>
+                      <span className="text-[11px] font-mono text-emerald-300/80 mt-1 inline-flex items-center gap-1">
+                        Requires operator response <ArrowUpRight className="w-3 h-3" />
+                      </span>
+                    </div>
+                    <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                      <MessageSquare className="w-8 h-8" strokeWidth={1.5}/>
+                    </div>
                   </div>
-                  <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400"><MessageSquare className="w-8 h-8" strokeWidth={1.5}/></div>
-                </div>
+                </Card3DTilt>
               </div>
 
-              <div className="bg-[#13172e]/50 border border-indigo-800/30 rounded-2xl p-8 flex items-center justify-center min-h-[400px]">
-                <div className="text-center">
-                  <ShieldAlert className="w-16 h-16 text-indigo-500/40 mx-auto mb-4" strokeWidth={1} />
-                  <h3 className="text-xl font-bold text-white mb-2">System Metrics Active</h3>
-                  <p className="text-indigo-300/80 text-sm max-w-md mx-auto">Select a module from the sidebar to manage users, update permissions, or process incoming inquiries.</p>
+              {/* Live Infrastructure Health & Topology Visualizer (Pinterest Ref 3) */}
+              <Card3DTilt maxTilt={4} className="p-8 relative overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-indigo-800/40 pb-6 mb-6">
+                  <div>
+                    <div className="inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-cyan-400 font-bold mb-1">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                      Real-Time Infrastructure Topology
+                    </div>
+                    <h3 className="text-xl font-black text-white">Central Command Telemetry Backbone</h3>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 font-mono text-xs flex items-center gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> All Nodes Nominal
+                    </span>
+                  </div>
                 </div>
-              </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    { node: "Asia-East Edge Gateway", ping: "9ms", status: "Active", load: "14%", icon: Server, color: "text-cyan-400", border: "border-cyan-500/30" },
+                    { node: "Supabase Core DB", ping: "16ms", status: "Healthy", load: "22%", icon: Database, color: "text-blue-400", border: "border-blue-500/30" },
+                    { node: "SMTP Campaign Relay", ping: "24ms", status: "Idle", load: "4%", icon: Mail, color: "text-fuchsia-400", border: "border-fuchsia-500/30" },
+                    { node: "Session Auth Crypt", ping: "2ms", status: "Armed", load: "8%", icon: Lock, color: "text-emerald-400", border: "border-emerald-500/30" },
+                  ].map((item, idx) => (
+                    <div key={idx} className={`p-4 rounded-xl bg-[#090b14]/70 border ${item.border} flex flex-col justify-between group hover:border-indigo-400 transition-all`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className={`p-2 rounded-lg bg-indigo-950/80 ${item.color}`}>
+                          <item.icon className="w-4 h-4" />
+                        </div>
+                        <span className="text-[10px] font-mono text-emerald-400 font-bold">{item.status}</span>
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white mb-1">{item.node}</div>
+                        <div className="flex items-center justify-between text-[11px] font-mono text-indigo-300/80">
+                          <span>Latency: {item.ping}</span>
+                          <span>Load: {item.load}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card3DTilt>
             </div>
           )}
 
@@ -2080,7 +2145,18 @@ export default function AdminDashboard() {
                               </div>
                             )}
                             <div>
-                              <div className="text-sm font-bold text-white">{user.first_name} {user.last_name}</div>
+                              {activeTab === 'customers' ? (
+                                <Link
+                                  href={`/admin-dashboard/customers/${user.id}`}
+                                  className="text-sm font-bold text-white hover:text-fuchsia-400 transition-colors flex items-center gap-1 group"
+                                  title="View full profile and validate trial request"
+                                >
+                                  <span>{user.first_name} {user.last_name}</span>
+                                  <ArrowUpRight className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity text-fuchsia-400" />
+                                </Link>
+                              ) : (
+                                <div className="text-sm font-bold text-white">{user.first_name} {user.last_name}</div>
+                              )}
                               <div className="text-xs text-indigo-400/70 font-mono mt-1">ID: {user.id.substring(0, 8)}...</div>
                             </div>
                           </div>
@@ -2143,10 +2219,25 @@ export default function AdminDashboard() {
                         <td className="px-6 py-5 whitespace-nowrap text-sm font-medium text-right">
                           <div className="flex items-center justify-end gap-2">
                             
+                            {activeTab === 'customers' && (
+                              <Link
+                                href={`/admin-dashboard/customers/${user.id}`}
+                                className={`text-xs font-bold py-1.5 px-3 rounded-lg transition-all flex items-center gap-1.5 border ${
+                                  user.status === 'pending'
+                                    ? 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/50 text-amber-300 hover:text-white shadow-[0_0_12px_rgba(245,158,11,0.25)] animate-pulse'
+                                    : 'bg-fuchsia-600/20 hover:bg-fuchsia-500/40 border-fuchsia-500/50 text-fuchsia-300 hover:text-white'
+                                }`}
+                                title={user.status === 'pending' ? "Carefully validate trial request on profile page" : "View customer profile"}
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                {user.status === 'pending' ? 'Validate Trial' : 'View Profile'}
+                              </Link>
+                            )}
+
                             {activeTab === 'customers' && user.status === 'pending' && (
-                              <div className="flex gap-2 mr-2">
-                                <button onClick={() => handleTrialAction(user.id, user.email, user.first_name, 'approve')} disabled={processingId === user.id} className="bg-emerald-600/20 hover:bg-emerald-500/40 border border-emerald-500/50 text-emerald-400 hover:text-white text-xs font-bold py-1.5 px-3 rounded transition-all disabled:opacity-50 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> APP</button>
-                                <button onClick={() => handleTrialAction(user.id, user.email, user.first_name, 'reject')} disabled={processingId === user.id} className="bg-red-600/20 hover:bg-red-500/40 border border-red-500/50 text-red-400 hover:text-white text-xs font-bold py-1.5 px-3 rounded transition-all disabled:opacity-50 flex items-center gap-1"><XCircle className="w-3 h-3"/> REJ</button>
+                              <div className="flex gap-1.5 mr-1">
+                                <button onClick={() => handleTrialAction(user.id, user.email, user.first_name, 'approve')} disabled={processingId === user.id} className="bg-emerald-600/20 hover:bg-emerald-500/40 border border-emerald-500/50 text-emerald-400 hover:text-white text-xs font-bold py-1.5 px-2.5 rounded transition-all disabled:opacity-50 flex items-center gap-1" title="Quick Approve"><CheckCircle className="w-3 h-3"/> APP</button>
+                                <button onClick={() => handleTrialAction(user.id, user.email, user.first_name, 'reject')} disabled={processingId === user.id} className="bg-red-600/20 hover:bg-red-500/40 border border-red-500/50 text-red-400 hover:text-white text-xs font-bold py-1.5 px-2.5 rounded transition-all disabled:opacity-50 flex items-center gap-1" title="Quick Reject"><XCircle className="w-3 h-3"/> REJ</button>
                               </div>
                             )}
 
