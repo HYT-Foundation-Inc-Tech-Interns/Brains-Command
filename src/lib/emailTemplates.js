@@ -514,3 +514,100 @@ export function welcomeEmail({ firstName, lastName, email, company, createdAt })
     ].join('\n'),
   };
 }
+
+export function trialApprovedEmail({ firstName, email, modules = [], trialDays = 14, adminNote = '' }) {
+  const name = firstName ? firstName.trim() : 'Valued Partner';
+  const moduleLabels = {
+    hms: 'Frontdesk — Hotel & Hospitality Management System',
+    pms: 'Landlord — Property Management System',
+    hvms: 'Butler — High-Value Property & Villa Suite',
+    bms: 'Sekyu — Building Management & Security Surveillance',
+    iot: 'Housekeeper — IoT Sensor Telemetry & Automation',
+  };
+
+  const moduleListHtml = modules && modules.length > 0
+    ? `<ul style="margin:10px 0 16px 20px;padding:0;color:${C.body};font-family:${FONT};font-size:14px;line-height:1.7;">` +
+      modules.map(m => `<li><strong>${m.toUpperCase()}</strong>: ${moduleLabels[m] || m.toUpperCase()}</li>`).join('') +
+      `</ul>`
+    : `<p style="margin:10px 0 16px;color:${C.accentInk};font-family:${FONT};font-size:14px;font-weight:bold;">All Core Facilities & Connected Suites</p>`;
+
+  const adminNoteBlock = adminNote ? `
+    <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:14px 16px;margin:16px 0;">
+      <p style="margin:0 0 4px;font-family:${FONT};font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;">Note from Admin:</p>
+      <p style="margin:0;font-family:${FONT};font-size:13px;color:#78350f;line-height:1.5;">${adminNote}</p>
+    </div>` : '';
+
+  const content = [
+    heading('Access Granted: Your Free Trial is Active!'),
+    paragraph(`Hello ${name},`),
+    paragraph(`Great news! Your application for a <strong>${trialDays}-day free trial</strong> of Brains Central Command has been validated and approved.`),
+    adminNoteBlock,
+    `<div style="background:${C.soft};border:1px solid ${C.border};border-radius:10px;padding:18px 20px;margin:20px 0;">
+      <p style="margin:0 0 8px;font-family:${FONT};font-size:12px;font-weight:800;letter-spacing:1px;color:${C.ink};text-transform:uppercase;">
+        Unlocked Systems & Modules:
+      </p>
+      ${moduleListHtml}
+      <p style="margin:0;font-family:${FONT};font-size:12px;color:${C.muted};">
+        Your access is active for ${trialDays} days starting today. The locked modules in your dashboard are now unlocked.
+      </p>
+    </div>`,
+    paragraph('You can immediately sign in to your dashboard to begin accessing the provisioned suites.'),
+    button(SITE_URL + '/', 'Launch Central Command Dashboard'),
+    paragraph('Need a custom walkthrough or technical assistance? Reply directly to this email or reach our enterprise team at <a href="mailto:hello@brains.asia" style="color:' + C.accent + ';text-decoration:none;">hello@brains.asia</a>.', { last: true }),
+  ].join('');
+
+  return {
+    subject: 'Central Command: Free Trial Approved & Modules Unlocked!',
+    html: layout({
+      preheader: `Your ${trialDays}-day trial is active with unlocked modules.`,
+      title: 'Free Trial Approved',
+      content,
+    }),
+    text: [
+      `Hello ${name},`,
+      '',
+      `Your ${trialDays}-day free trial for Brains Central Command has been approved!`,
+      `Unlocked modules: ${modules.join(', ').toUpperCase()}`,
+      adminNote ? `Admin note: ${adminNote}\n` : '',
+      `Sign in to your dashboard: ${SITE_URL}/`,
+      '',
+      'Brains Infinite Innovations',
+    ].join('\n'),
+  };
+}
+
+export function trialRejectedEmail({ firstName, email, reason = '' }) {
+  const name = firstName ? firstName.trim() : 'Applicant';
+  const customReason = reason ? `
+    <div style="background:#fee2e2;border:1px solid #fecaca;border-radius:8px;padding:14px 16px;margin:16px 0;">
+      <p style="margin:0 0 4px;font-family:${FONT};font-size:11px;font-weight:700;color:#991b1b;text-transform:uppercase;">Validation Note:</p>
+      <p style="margin:0;font-family:${FONT};font-size:13px;color:#7f1d1d;line-height:1.5;">${reason}</p>
+    </div>` : '';
+
+  const content = [
+    heading('Update Regarding Your Free Trial Request'),
+    paragraph(`Hello ${name},`),
+    paragraph('Thank you for your interest in Brains Central Command.'),
+    customReason,
+    paragraph('After careful review of your application details, we were unable to approve your free trial request at this time. This may be due to incomplete organizational credentials, unverified domain information, or unmet eligibility criteria for this preview cycle.'),
+    paragraph('If you believe this is in error or would like to discuss private enterprise deployment options, please contact our support team at <a href="mailto:hello@brains.asia" style="color:' + C.accent + ';text-decoration:none;">hello@brains.asia</a>.'),
+  ].join('');
+
+  return {
+    subject: 'Central Command: Free Trial Request Update',
+    html: layout({
+      preheader: 'Update regarding your Central Command free trial request.',
+      title: 'Trial Request Update',
+      content,
+    }),
+    text: [
+      `Hello ${name},`,
+      '',
+      'Thank you for your interest in Brains Central Command.',
+      'We are unable to approve your free trial request at this time.',
+      reason ? `Reason: ${reason}\n` : '',
+      'Please reach out to hello@brains.asia if you have any questions.',
+    ].join('\n'),
+  };
+}
+

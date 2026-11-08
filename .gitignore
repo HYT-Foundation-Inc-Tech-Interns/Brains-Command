@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Documentation, Manuals & Checklists (Excluded from code push)
+*UAT-CHECKLIST*.md
+USER-MANUAL*.md
+PROMOTIONAL-*.md
+VIDEO-*.md
+*.ppt
+*.pptx
+
+# Video Generation & Media Deliverables
+demo-video/
+*.mp4
+public/*.mp4

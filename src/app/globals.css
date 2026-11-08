@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #090b14;
+  --foreground: #ededed;
 }
 
 @theme inline {
@@ -12,15 +12,178 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom Keyframe Animations for High-Tech Holographic Effects */
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spinSlowReverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(1deg); }
+}
+
+@keyframes floatSlowReverse {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(10px) rotate(-1deg); }
+}
+
+@keyframes floatFluid {
+  0%, 100% {
+    transform: translate3d(0, 0px, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0) rotate(1.2deg);
+  }
+}
+
+@keyframes floatFluidCounter {
+  0%, 100% {
+    transform: translate3d(0, 0px, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(0, 10px, 0) rotate(-1.2deg);
+  }
+}
+
+@keyframes morphPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+@keyframes radarSweep {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.4; filter: drop-shadow(0 0 15px rgba(217, 70, 239, 0.4)); }
+  50% { opacity: 0.9; filter: drop-shadow(0 0 30px rgba(56, 189, 248, 0.8)); }
+}
+
+@keyframes spin3D {
+  0% { transform: perspective(800px) rotateY(0deg) rotateX(6deg); }
+  50% { transform: perspective(800px) rotateY(180deg) rotateX(-6deg); }
+  100% { transform: perspective(800px) rotateY(360deg) rotateX(6deg); }
+}
+
+@keyframes pulseRipple {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2.8); opacity: 0; }
+}
+
+@keyframes scroll-left { 
+  0% { transform: translateX(0); } 
+  100% { transform: translateX(calc(-50% - 1rem)); } 
+}
+
+.animate-spin-3d {
+  animation: spin3D 14s linear infinite;
+}
+
+.animate-pulse-ripple {
+  animation: pulseRipple 1.6s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+.animate-spin-slow {
+  animation: spinSlow 25s linear infinite;
+}
+
+.animate-spin-slow-reverse {
+  animation: spinSlowReverse 35s linear infinite;
+}
+
+.animate-float-slow {
+  animation: floatSlow 6s ease-in-out infinite;
+}
+
+.animate-float-slow-reverse {
+  animation: floatSlowReverse 7s ease-in-out infinite;
+}
+
+.animate-float-fluid {
+  animation: floatFluid 6s ease-in-out infinite;
+}
+
+.animate-float-fluid-counter {
+  animation: floatFluidCounter 7s ease-in-out infinite;
+}
+
+.animate-morph-pulse {
+  animation: morphPulse 4s ease-in-out infinite;
+}
+
+.animate-radar-sweep {
+  animation: radarSweep 4s linear infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+/* Cybernetic Hologram Grid Background */
+.cyber-grid {
+  background-image: 
+    linear-gradient(to right, rgba(99, 102, 241, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(99, 102, 241, 0.07) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Glassmorphism Surface with Border Gradient */
+.holo-panel {
+  background: rgba(19, 23, 46, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(129, 140, 248, 0.2);
+}
+
+.holo-panel-active {
+  background: rgba(22, 27, 56, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(217, 70, 239, 0.5);
+  box-shadow: 0 0 30px rgba(217, 70, 239, 0.2), inset 0 0 20px rgba(59, 130, 246, 0.1);
+}
+
+/* Premium Apple/Linear Scroll Reveal Transitions */
+.scroll-reveal {
+  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.85s cubic-bezier(0.16, 1, 0.3, 1),
+              filter 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform, filter;
+}
+
+.scroll-hidden {
+  opacity: 0;
+  transform: translate3d(0, 32px, 0) scale(0.98);
+  filter: blur(6px);
+}
+
+.scroll-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  filter: blur(0px);
 }

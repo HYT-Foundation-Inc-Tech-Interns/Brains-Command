@@ -8,9 +8,19 @@ import {
   Users, PieChart, Handshake, TrendingUp, ShoppingCart, 
   Package, Wallet, Truck, Navigation, KanbanSquare,
   Phone, Mail, MapPin,
-  Building2, Landmark, ClipboardCheck, Cpu, Radio, // <-- Added these 5
-  Eye, EyeOff
+  Building2, Landmark, ClipboardCheck, Cpu, Radio,
+  Eye, EyeOff, Sparkles, Shield, ArrowRight,
+  Layers, Link2, Briefcase, Monitor
 } from 'lucide-react';
+
+import BrainsHoloCore from '@/components/animations/BrainsHoloCore';
+import Card3DTilt from '@/components/animations/Card3DTilt';
+import ProductHoloStage from '@/components/animations/ProductHoloStage';
+import NeuralPipeline from '@/components/animations/NeuralPipeline';
+import ScrollProgressHUD from '@/components/animations/ScrollProgressHUD';
+import SectionDivider from '@/components/animations/SectionDivider';
+import ScrollInOut from '@/components/animations/ScrollInOut';
+import ScrollLetters from '@/components/animations/ScrollLetters';
 
 // --- Sign In & Forgot Password Pop-up Modal Component ---
 const SignInModal = ({ onClose }) => {
@@ -454,10 +464,12 @@ const InquiryModal = ({ subject, type, onClose }) => {
   );
 };
 
-// --- UPDATED CONNECTOR TRIAL MODAL COMPONENT ---
+// --- UPDATED CONNECTOR TRIAL MODAL COMPONENT (WITH ACCOUNT REQUIREMENT) ---
 const ConnectorTrialModal = ({ systemName, onClose }) => {
-  const [submitted, setSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showNoAccountModal, setShowNoAccountModal] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -466,30 +478,45 @@ const ConnectorTrialModal = ({ systemName, onClose }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage("");
     setLoading(true);
 
-    const formData = {
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData.entries());
+
+    const payload = {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      company: data.company,
+      password: data.password,
       type: 'Connector Trial',
-      subject: systemName,
-      name: e.target.fullName.value,
-      email: e.target.email.value,
-      company: e.target.companyName.value,
-      details: 'Automated request for 14-day connector module trial.'
+      systemName: systemName,
+      details: `Automated request for 14-day connector module trial: ${systemName}.`
     };
 
     try {
-      const res = await fetch('/api/inquiries', {
+      const res = await fetch('/api/request-trial', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
 
-      if (res.ok) {
-        setSubmitted(true);
-        setTimeout(() => onClose(), 2500);
+      const result = await res.json();
+
+      if (res.status === 404) {
+        setShowNoAccountModal(true);
+      } else if (res.ok) {
+        setShowVerificationModal(true);
+        e.target.reset();
+        setTimeout(() => {
+          onClose();
+        }, 3500);
+      } else {
+        setErrorMessage(result.message || "Failed to validate trial request.");
       }
     } catch (error) {
-      console.error("Submission failed", error);
+      setErrorMessage("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -498,44 +525,155 @@ const ConnectorTrialModal = ({ systemName, onClose }) => {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-[#090b14]/80 backdrop-blur-sm cursor-pointer" onClick={onClose}></div>
-      <div className="relative w-full max-w-md bg-[#13172e] border border-blue-500/50 rounded-2xl p-8 shadow-[0_0_40px_rgba(59,130,246,0.15)] z-10 transition-all duration-300">
-        <button onClick={onClose} className="absolute top-4 right-4 text-indigo-400 hover:text-violet-400 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-        
-        {submitted ? (
-          <div className="text-center py-8 animate-fadeIn">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4 border border-emerald-500/50 text-emerald-400 text-3xl shadow-[0_0_15px_rgba(16,185,129,0.3)]">✓</div>
-            <h3 className="text-xl font-bold text-white mb-2">Request Sent!</h3>
-            <p className="text-sm text-indigo-200">Our team will contact you shortly to set up your {systemName} trial environment.</p>
+
+      {showNoAccountModal ? (
+        <div className="relative w-full max-w-md bg-[#13172e] border border-red-500/50 rounded-2xl p-8 shadow-[0_0_40px_rgba(239,68,68,0.25)] z-10 text-center animate-fadeIn">
+          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-500/20 border border-red-500/50 mb-6">
+            <svg className="h-8 w-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
           </div>
-        ) : (
+          
+          <h3 className="text-2xl font-bold text-white mb-2">Account Not Found</h3>
+          <p className="text-sm text-indigo-200 mb-6 leading-relaxed">
+            We couldn't find an existing Central Command account with that email. You must create an account before requesting a free trial for the <span className="text-blue-400 font-bold">{systemName}</span> connector.
+          </p>
+          
+          <div className="flex flex-col gap-3">
+            <a 
+              href="/get-started"
+              className="w-full text-center bg-gradient-to-r from-fuchsia-600 to-blue-600 hover:from-fuchsia-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-lg transition-all shadow-lg active:scale-95"
+            >
+              Create an Account
+            </a>
+            <a 
+              href="/"
+              onClick={(e) => {
+                e.preventDefault();
+                setShowNoAccountModal(false);
+                onClose();
+              }}
+              className="w-full text-center bg-[#090b14] border border-indigo-700 hover:border-fuchsia-500 text-indigo-200 font-bold py-3 px-4 rounded-lg transition-all active:scale-95"
+            >
+              Sign In Instead
+            </a>
+            <button 
+              type="button"
+              onClick={() => setShowNoAccountModal(false)}
+              className="w-full text-xs text-indigo-400 hover:text-white mt-1 transition-colors"
+            >
+              Close and try a different email
+            </button>
+          </div>
+        </div>
+      ) : showVerificationModal ? (
+        <div className="relative w-full max-w-md bg-[#13172e] border border-amber-500/50 rounded-2xl p-8 shadow-[0_0_40px_rgba(245,158,11,0.25)] z-10 text-center animate-fadeIn">
+          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-amber-500/20 border border-amber-500/50 mb-6">
+            <svg className="h-8 w-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          
+          <h3 className="text-2xl font-bold text-white mb-2">Verification Required</h3>
+          <p className="text-sm text-indigo-200 mb-2">
+            Your account has been verified and your request for the <span className="text-blue-400 font-bold">{systemName}</span> connector is now <span className="font-bold text-amber-400">pending approval</span>.
+          </p>
+          <p className="text-xs text-indigo-300/80 mb-6 leading-relaxed">
+            An administrator will validate your organization request and unlock the module in your dashboard. You will receive an email once approved.
+          </p>
+          
+          <div className="flex items-center justify-center space-x-2 text-fuchsia-400 text-xs font-mono tracking-widest">
+            <svg className="animate-spin h-4 w-4 text-fuchsia-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>REQUEST LOGGED — CLOSING...</span>
+          </div>
+        </div>
+      ) : (
+        <div className="relative w-full max-w-lg bg-[#13172e] border border-blue-500/50 rounded-2xl p-6 md:p-8 shadow-[0_0_40px_rgba(59,130,246,0.15)] z-10 transition-all duration-300">
+          <button onClick={onClose} className="absolute top-4 right-4 text-indigo-400 hover:text-white transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          
           <div className="animate-fadeIn">
-            <h3 className="text-2xl font-bold text-white mb-2">Request Free Trial</h3>
-            <p className="text-sm text-indigo-300/80 mb-6">Get 14-days free access to the <span className="text-blue-400 font-bold">{systemName}</span> module.</p>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30">
+                Connector System
+              </span>
+              <span className="text-[10px] font-mono text-indigo-400">14-Day Free Preview</span>
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-1">Request {systemName} Trial</h3>
+            <p className="text-xs text-indigo-300/80 mb-5">
+              Account required. Existing operators please verify your credentials below to request free trial provisioning.
+            </p>
+
+            {errorMessage && (
+              <div className="p-3 bg-red-950/50 border border-red-500/40 rounded-xl text-xs font-semibold text-red-300 mb-4 flex items-center gap-2">
+                <svg className="w-4 h-4 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>{errorMessage}</span>
+              </div>
+            )}
             
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-indigo-300 mb-1 uppercase tracking-wide">Full Name</label>
-                <input name="fullName" type="text" required className="w-full bg-[#090b14] border border-indigo-800/50 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-colors" placeholder="John Doe" />
+            <form onSubmit={handleSubmit} className="space-y-3.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-indigo-300 mb-1 uppercase tracking-wide">First Name</label>
+                  <input name="firstName" type="text" required className="w-full bg-[#090b14] border border-indigo-800/50 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/60 transition-colors" placeholder="John" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-indigo-300 mb-1 uppercase tracking-wide">Last Name</label>
+                  <input name="lastName" type="text" required className="w-full bg-[#090b14] border border-indigo-800/50 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/60 transition-colors" placeholder="Doe" />
+                </div>
               </div>
+
               <div>
-                <label className="block text-xs font-bold text-indigo-300 mb-1 uppercase tracking-wide">Company Email</label>
-                <input name="email" type="email" required className="w-full bg-[#090b14] border border-indigo-800/50 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-colors" placeholder="john@company.com" />
+                <label className="block text-[11px] font-bold text-indigo-300 mb-1 uppercase tracking-wide">Company Name</label>
+                <input name="company" type="text" required className="w-full bg-[#090b14] border border-indigo-800/50 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/60 transition-colors" placeholder="Acme Corp" />
               </div>
+
               <div>
-                <label className="block text-xs font-bold text-indigo-300 mb-1 uppercase tracking-wide">Company Name</label>
-                <input name="companyName" type="text" required className="w-full bg-[#090b14] border border-indigo-800/50 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-colors" placeholder="Acme Corp" />
+                <label className="block text-[11px] font-bold text-indigo-300 mb-1 uppercase tracking-wide">Work / Account Email</label>
+                <input name="email" type="email" required className="w-full bg-[#090b14] border border-indigo-800/50 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/60 transition-colors" placeholder="john@company.com" />
               </div>
-              <button disabled={loading} type="submit" className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-bold py-3 px-4 rounded-lg mt-6 shadow-[0_4px_14px_rgba(59,130,246,0.25)] active:scale-95 transition-all disabled:opacity-50">
-                {loading ? 'Submitting...' : 'Submit Request'}
+
+              <div>
+                <label className="block text-[11px] font-bold text-indigo-300 mb-1 uppercase tracking-wide">Account Password</label>
+                <input name="password" type="password" required className="w-full bg-[#090b14] border border-indigo-800/50 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/60 transition-colors" placeholder="••••••••" />
+              </div>
+
+              <button 
+                disabled={loading} 
+                type="submit" 
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3 px-4 rounded-xl mt-4 shadow-[0_4px_16px_rgba(59,130,246,0.3)] active:scale-95 transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Verifying Credentials...</span>
+                  </>
+                ) : (
+                  'Validate & Request Connector Trial'
+                )}
               </button>
+
+              <p className="text-center text-[11px] text-indigo-400/80 pt-1">
+                Don't have an account yet?{' '}
+                <a href="/get-started" className="text-blue-400 hover:underline font-bold">
+                  Create an Account
+                </a>
+              </p>
             </form>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -732,54 +870,63 @@ const ParticleBackground = () => {
   );
 };
 
-// --- Bulletproof Animation Wrapper ---
+// --- Bulletproof Animation Wrapper with In & Out Scroll Support ---
 // Starts VISIBLE so the server-rendered HTML is readable even when the client
-// bundle never runs (blocked script, stale chunk, failed hydration). Only
-// content that is below the fold at mount is hidden and faded in on scroll,
-// so a JS failure can never blank the page.
-const FadeIn = ({ children, delay = 0, direction = "up" }) => {
+// bundle never runs. When client hydrates, smoothly transitions components IN
+// upon entering the viewport and OUT when leaving the viewport.
+const FadeIn = ({ children, delay = 0, direction = "up", inOut = true }) => {
   const [isVisible, setIsVisible] = useState(true);
   const domRef = useRef(null);
+  const inOutRef = useRef(inOut);
+  inOutRef.current = inOut;
 
   useEffect(() => {
     const node = domRef.current;
     if (!node) return;
 
-    // Already on screen at mount: leave it exactly as rendered.
+    // Already on screen at mount: leave it visible
     const rect = node.getBoundingClientRect();
-    if (rect.top < window.innerHeight && rect.bottom > 0) return;
+    if (rect.top < window.innerHeight && rect.bottom > 0) {
+      setIsVisible(true);
+    } else {
+      setIsVisible(false);
+    }
 
-    if (typeof IntersectionObserver === "undefined") return;
-
-    setIsVisible(false);
-
-    // Safety net: never leave off-screen content hidden forever.
-    const fallback = setTimeout(() => setIsVisible(true), 3000);
+    if (typeof IntersectionObserver === "undefined") {
+      setIsVisible(true);
+      return;
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             setIsVisible(true);
-            observer.unobserve(entry.target);
-            clearTimeout(fallback);
+            if (!inOutRef.current) observer.unobserve(entry.target);
+          } else if (inOutRef.current) {
+            setIsVisible(false);
           }
         });
       },
-      { threshold: 0.05, rootMargin: "0px 0px 50px 0px" }
+      { threshold: 0.08, rootMargin: "-25px 0px -25px 0px" }
     );
 
     observer.observe(node);
 
     return () => {
-      clearTimeout(fallback);
-      observer.unobserve(node);
+      observer.disconnect();
     };
   }, []);
 
-  const baseClasses = "transition-all duration-700 ease-out will-change-transform";
-  const hiddenClasses = direction === "up" ? "opacity-0 translate-y-8" : "opacity-0 scale-95";
-  const visibleClasses = "opacity-100 translate-y-0 scale-100";
+  const baseClasses = "transition-all duration-850 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform will-change-[filter,opacity]";
+  const hiddenClasses = direction === "up" 
+    ? "opacity-0 translate-y-12 scale-[0.97] blur-[5px]" 
+    : direction === "down"
+    ? "opacity-0 -translate-y-12 scale-[0.97] blur-[5px]"
+    : direction === "scale"
+    ? "opacity-0 scale-90 blur-[5px]"
+    : "opacity-0 translate-y-8 scale-[0.98] blur-[4px]";
+  const visibleClasses = "opacity-100 translate-y-0 scale-100 blur-0";
 
   return (
     <div
@@ -984,7 +1131,7 @@ const ModuleSection = ({ data }) => (
       </div>
       
       <h2 className="text-4xl md:text-5xl font-bold mb-4 text-white">
-        {data.title} <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 to-blue-400 text-2xl align-middle ml-2">"{data.brainsName}"</span>
+        <ScrollLetters text={data.title} as="span" /> <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 to-blue-400 text-2xl align-middle ml-2">"{data.brainsName}"</span>
       </h2>
       <p className="text-xl text-indigo-300 mb-8">{data.tagline}</p>
       
@@ -1055,7 +1202,7 @@ const ConnectorShowcase = () => {
               alt="Connector Ecosystem" 
               className="h-16 md:h-20 w-auto mx-auto mb-6 object-contain drop-shadow-[0_0_15px_rgba(139,92,246,0.3)]" 
             />
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">Connecting Systems. Bridging People.</h2>
+            <ScrollLetters text="Connecting Systems. Bridging People." as="h2" className="text-4xl md:text-5xl font-bold text-white mb-6" glow />
             <p className="text-indigo-200 max-w-3xl mx-auto">A comprehensive suite of management software designed to unify your business operations, from human resources to enterprise resource planning.</p>
           </div>
         </FadeIn>
@@ -1151,6 +1298,7 @@ export default function CentralCommand() {
   const [isVideoOpen, setIsVideoOpen] = useState(false);
   const [inquiryModal, setInquiryModal] = useState({ isOpen: false, subject: "", type: "" });
   const [isConsultationOpen, setIsConsultationOpen] = useState(false);
+  const [connectorTrialSystem, setConnectorTrialSystem] = useState(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -1184,6 +1332,7 @@ export default function CentralCommand() {
     <div className="relative min-h-screen text-gray-100 font-sans selection:bg-fuchsia-500/30 selection:text-fuchsia-100 bg-transparent">
       
       <ParticleBackground />
+      <ScrollProgressHUD />
 
       {isSignInOpen && <SignInModal onClose={() => setIsSignInOpen(false)} />}
       {isVideoOpen && <VideoModal onClose={() => setIsVideoOpen(false)} />}
@@ -1196,6 +1345,13 @@ export default function CentralCommand() {
           subject={inquiryModal.subject} 
           type={inquiryModal.type} 
           onClose={() => setInquiryModal({ isOpen: false, subject: "", type: "" })} 
+        />
+      )}
+
+      {connectorTrialSystem && (
+        <ConnectorTrialModal 
+          systemName={connectorTrialSystem} 
+          onClose={() => setConnectorTrialSystem(null)} 
         />
       )}
 
@@ -1239,34 +1395,111 @@ export default function CentralCommand() {
         </div>
       </nav>
 
-      <header id="platform" className="flex flex-col items-center justify-center text-center pt-32 pb-20 px-8 border-b border-indigo-900/30 bg-gradient-to-b from-[#090b14]/40 to-[#0d111f]/40 scroll-mt-24">
-        <FadeIn delay={150}>
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 max-w-4xl text-white">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-500 via-indigo-400 to-blue-400">Brains Infinite Innovations</span><br />
-            Progressive Technology for a Better World.
-          </h1>
-        </FadeIn>
+      <header id="platform" className="relative pt-28 pb-20 px-8 lg:px-16 border-b border-indigo-900/30 bg-gradient-to-b from-[#090b14]/60 via-[#0d111f]/50 to-[#090b14]/80 scroll-mt-24 overflow-hidden">
+        {/* Ambient Top Glow */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gradient-to-tr from-fuchsia-600/15 to-blue-600/15 blur-[120px] pointer-events-none" />
 
-        <FadeIn delay={200}>
-          <p className="text-lg md:text-xl text-indigo-200/90 max-w-3xl mb-10 leading-relaxed">
-            Unifying property operations, software systems, bespoke agency services, and B2B marketplaces into one central ecosystem. <br/>
-            <span className="font-semibold text-fuchsia-400 mt-2 block tracking-widest uppercase">"We got what you think!"</span>
-          </p>
-        </FadeIn>
-        
-        <FadeIn delay={250}>
-          <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6 w-full mt-4">
-            <a href="#software" className="bg-gradient-to-r from-fuchsia-600 to-blue-600 hover:from-fuchsia-500 hover:to-blue-500 text-white font-bold text-lg py-4 px-10 rounded-full transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(217,70,239,0.5)] active:scale-95 w-full sm:w-auto">
-              Explore Central Command
-            </a>
-            <button 
-            onClick={() => setIsVideoOpen(true)}
-            className="border-2 border-indigo-700 bg-[#13172e]/80 backdrop-blur-sm hover:border-fuchsia-500 hover:bg-[#1a1f3c]/80 text-indigo-100 font-bold text-lg py-4 px-10 rounded-full transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_20px_rgba(99,102,241,0.2)] active:scale-95 w-full sm:w-auto">
-              Watch Demo
-            </button>
+        <div className="max-w-[1600px] mx-auto grid lg:grid-cols-12 gap-12 items-center relative z-10">
+          
+          {/* Left Column: Vision & Action */}
+          <div className="lg:col-span-7 text-left">
+            <FadeIn delay={100}>
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-fuchsia-500/40 bg-fuchsia-950/40 text-fuchsia-300 text-xs font-mono tracking-widest uppercase mb-6 shadow-[0_0_20px_rgba(217,70,239,0.25)]">
+                <Sparkles className="w-3.5 h-3.5 text-fuchsia-400 animate-pulse" />
+                <span>Central Command OS // Neural Ecosystem</span>
+              </div>
+
+              <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight mb-6 text-white leading-[1.08]">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-500 via-indigo-300 to-blue-400">Brains Infinite Innovations</span><br />
+                <ScrollLetters text="Progressive Technology for a Better World." as="span" className="text-white block mt-1" glow />
+              </h1>
+            </FadeIn>
+
+            <FadeIn delay={180}>
+              <p className="text-base sm:text-lg text-indigo-200/90 max-w-2xl mb-8 leading-relaxed">
+                Unifying property operations, software systems, bespoke agency services, and B2B marketplaces into one central command layer.
+                <span className="font-semibold text-fuchsia-400 mt-2 block tracking-wider uppercase text-sm">"We got what you think!"</span>
+              </p>
+            </FadeIn>
+            
+            <FadeIn delay={240}>
+              <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4 w-full mb-10">
+                <a href="#software" className="bg-gradient-to-r from-fuchsia-600 to-blue-600 hover:from-fuchsia-500 hover:to-blue-500 text-white font-bold text-base py-3.5 px-8 rounded-full transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(217,70,239,0.5)] active:scale-95 w-full sm:w-auto text-center flex items-center justify-center gap-2">
+                  <span>Explore Central Command</span>
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+                <button 
+                  onClick={() => setIsVideoOpen(true)}
+                  className="border border-indigo-700/80 bg-[#13172e]/80 backdrop-blur-sm hover:border-fuchsia-500 hover:bg-[#1a1f3c]/80 text-indigo-100 font-bold text-base py-3.5 px-8 rounded-full transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_20px_rgba(99,102,241,0.2)] active:scale-95 w-full sm:w-auto text-center"
+                >
+                  Watch Demo
+                </button>
+              </div>
+
+              {/* 4-Pillar Omnichannel Ecosystem Grid (First Page / Above the Fold) */}
+              <div className="pt-6 border-t border-indigo-900/50">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-indigo-400 font-bold">
+                    Brains Core Portfolio // 4 Integrated Pillars
+                  </span>
+                  <div className="flex items-center gap-1.5 font-mono text-[10px] text-emerald-400">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    <span>All Systems Live</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <a href="#software" className="group p-3 rounded-xl bg-[#13172e]/60 hover:bg-fuchsia-950/40 border border-fuchsia-500/30 hover:border-fuchsia-400 transition-all flex flex-col justify-between shadow-md animate-float-fluid backdrop-blur-sm">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-mono text-fuchsia-400 uppercase font-bold">01 / SaaS</span>
+                      <Layers className="w-3.5 h-3.5 text-fuchsia-400 group-hover:scale-110 transition-transform" />
+                    </div>
+                    <div className="text-xs font-black text-white">5 Modular Suites</div>
+                    <div className="text-[10px] text-indigo-300/70 truncate">HMS, PMS, HVMS, BMS, IoT</div>
+                  </a>
+
+                  <a href="#connector" style={{ animationDelay: '0.8s' }} className="group p-3 rounded-xl bg-[#13172e]/60 hover:bg-blue-950/40 border border-blue-500/30 hover:border-blue-400 transition-all flex flex-col justify-between shadow-md animate-float-fluid-counter backdrop-blur-sm">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-mono text-blue-400 uppercase font-bold">02 / Connectors</span>
+                      <Link2 className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
+                    </div>
+                    <div className="text-xs font-black text-white">10 Enterprise Bridges</div>
+                    <div className="text-[10px] text-indigo-300/70 truncate">HR, POS, AIS, CRM, Fleet</div>
+                  </a>
+
+                  <a href="#services" style={{ animationDelay: '1.6s' }} className="group p-3 rounded-xl bg-[#13172e]/60 hover:bg-amber-950/40 border border-amber-500/30 hover:border-amber-400 transition-all flex flex-col justify-between shadow-md animate-float-fluid backdrop-blur-sm">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-mono text-amber-400 uppercase font-bold">03 / Agency</span>
+                      <Briefcase className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                    </div>
+                    <div className="text-xs font-black text-white">6 Growth Divisions</div>
+                    <div className="text-[10px] text-indigo-300/70 truncate">Branding, Web Dev, Ads</div>
+                  </a>
+
+                  <a href="#hardware" style={{ animationDelay: '2.4s' }} className="group p-3 rounded-xl bg-[#13172e]/60 hover:bg-cyan-950/40 border border-cyan-500/30 hover:border-cyan-400 transition-all flex flex-col justify-between shadow-md animate-float-fluid-counter backdrop-blur-sm">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold">04 / Products</span>
+                      <Monitor className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                    </div>
+                    <div className="text-xs font-black text-white">Hardware &amp; Devices</div>
+                    <div className="text-[10px] text-indigo-300/70 truncate">Millennium 4K, THEHCO</div>
+                  </a>
+                </div>
+              </div>
+            </FadeIn>
           </div>
-        </FadeIn>
+
+          {/* Right Column: 3D Interactive Cybernetic Core (Reference 3 + Reference 1) */}
+          <div className="lg:col-span-5 flex items-center justify-center">
+            <FadeIn delay={200}>
+              <BrainsHoloCore />
+            </FadeIn>
+          </div>
+
+        </div>
       </header>
+
+      <SectionDivider accentColor="#d946ef" />
 
       {/* --- UPDATED: CLIENT ROSTER MARQUEE --- */}
       <div className="border-b border-indigo-900/30 bg-[#060810]/80 py-10 overflow-hidden relative">
@@ -1313,20 +1546,21 @@ export default function CentralCommand() {
         ))}
       </div>
 
-      {/* --- SOFTWARE SOLUTIONS --- */}
-      <div id="software" className="scroll-mt-24 pt-24 bg-gradient-to-b from-transparent to-[#0d111f]/30">
-        <div className="text-center max-w-4xl mx-auto px-8">
-          <h3 className="text-xs font-bold text-fuchsia-500 tracking-[0.2em] uppercase mb-4">SaaS Ecosystem</h3>
-          <h2 className="text-4xl font-bold text-white mb-6">Central Command Dashboard</h2>
-          <p className="text-indigo-200">Scale operations effortlessly with our modular property systems. Need more? Request add-ons for HRMS, CRM, Financial Accounting, and Fleet Parcel Tracking directly in your workspace.</p>
-        </div>
-        {modulesData.map((module) => (
-          <ModuleSection key={module.id} data={module} />
-        ))}
-      </div>
+      <SectionDivider accentColor="#ec4899" />
 
-      {/* --- CONNECTOR SHOWCASE --- */}
-      <ConnectorShowcase />
+      {/* --- CORE SAAS SYSTEMS: 3D HOLO-STAGE (Strictly the 5 Original Systems) --- */}
+      <section id="software" className="scroll-mt-24 pt-16 bg-gradient-to-b from-transparent via-[#0d111f]/40 to-transparent">
+        <ProductHoloStage onRequestDemo={() => window.location.href = '/free-trial'} />
+      </section>
+
+      <SectionDivider accentColor="#38bdf8" />
+
+      {/* --- CONNECTOR SHOWCASE & NEURAL PIPELINE (Reference 3) --- */}
+      <section id="connector" className="scroll-mt-24 pt-10 border-b border-indigo-900/30 bg-gradient-to-b from-[#090b14]/50 to-[#0d111f]/50">
+        <NeuralPipeline onRequestTrial={(sysName) => setConnectorTrialSystem(sysName)} />
+      </section>
+
+      <SectionDivider accentColor="#8b5cf6" />
 
       {/* --- ENHANCED AGENCY SERVICES --- */}
       <section id="services" className="py-24 border-b border-indigo-900/30 px-8 lg:px-12 bg-gradient-to-b from-[#090b14]/50 to-[#0d111f]/50 scroll-mt-24">
@@ -1334,45 +1568,49 @@ export default function CentralCommand() {
           <FadeIn>
             <div className="mb-16">
               <h3 className="text-xs font-bold text-blue-500 tracking-[0.2em] uppercase mb-4">Bespoke Enterprise Solutions</h3>
-              <h2 className="text-4xl md:text-5xl font-bold text-white max-w-2xl">Tailored Agency Services for Business Expansion.</h2>
+              <ScrollLetters text="Tailored Agency Services for Business Expansion." as="h2" className="text-4xl md:text-5xl font-bold text-white max-w-2xl" glow />
             </div>
           </FadeIn>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {agencyServices.map((service, idx) => (
               <FadeIn key={idx} delay={idx * 100}>
-                <div className={`bg-[#13172e]/60 border ${service.glow.split(' ')[1] || 'border-indigo-800/40'} rounded-2xl overflow-hidden transition-all duration-500 h-full flex flex-col justify-between group ${service.glow}`}>
-                  
-                  <div className="w-full h-48 bg-[#090b14] overflow-hidden relative">
-                    <img 
-                      src={service.image} 
-                      alt={service.title} 
-                      className="w-full h-full object-cover opacity-70 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 ease-out" 
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#13172e]/60 via-transparent to-transparent"></div>
-                  </div>
-
-                  <div className="p-8 pt-6 flex-grow flex flex-col justify-between">
-                    <div>
-                      <h4 className={`text-xl font-bold text-white mb-3 transition-colors ${service.textGlow}`}>{service.title}</h4>
-                      <p className="text-sm text-indigo-200/90 leading-relaxed mb-8">{service.desc}</p>
-                    </div>
+                <Card3DTilt maxTilt={8} className="h-full">
+                  <div className={`overflow-hidden transition-all duration-500 h-full flex flex-col justify-between group`}>
                     
-                    <div className="pt-4 border-t border-indigo-800/50 mt-auto">
-                      <button 
-                        onClick={() => openInquiryModal(service.title, 'Service')}
-                        className={`w-full bg-gradient-to-r ${service.color} opacity-80 hover:opacity-100 text-white font-bold py-3 rounded-lg transition-all active:scale-95 shadow-md`}
-                      >
-                        Avail Service
-                      </button>
+                    <div className="w-full h-48 bg-[#090b14] overflow-hidden relative">
+                      <img 
+                        src={service.image} 
+                        alt={service.title} 
+                        className="w-full h-full object-cover opacity-70 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 ease-out" 
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#13172e]/60 via-transparent to-transparent"></div>
                     </div>
-                  </div>
 
-                </div>
+                    <div className="p-8 pt-6 flex-grow flex flex-col justify-between">
+                      <div>
+                        <h4 className={`text-xl font-bold text-white mb-3 transition-colors ${service.textGlow}`}>{service.title}</h4>
+                        <p className="text-sm text-indigo-200/90 leading-relaxed mb-8">{service.desc}</p>
+                      </div>
+                      
+                      <div className="pt-4 border-t border-indigo-800/50 mt-auto">
+                        <button 
+                          onClick={() => openInquiryModal(service.title, 'Service')}
+                          className={`w-full bg-gradient-to-r ${service.color} opacity-85 hover:opacity-100 text-white font-bold py-3 rounded-lg transition-all active:scale-95 shadow-md cursor-pointer`}
+                        >
+                          Avail Service
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                </Card3DTilt>
               </FadeIn>
             ))}
           </div>
         </div>
       </section>
+
+      <SectionDivider accentColor="#f59e0b" />
 
       {/* --- SUBSIDIARY BRANDS ECOSYSTEM --- */}
       <section id="brands" className="py-24 border-b border-indigo-900/30 px-8 lg:px-12 backdrop-blur-sm scroll-mt-24">
@@ -1380,29 +1618,33 @@ export default function CentralCommand() {
           <FadeIn>
             <div className="text-center mb-16">
               <h3 className="text-xs font-bold text-fuchsia-500 tracking-[0.2em] uppercase mb-4">The Brains Network</h3>
-              <h2 className="text-4xl font-bold text-white mb-6">Our Diverse Subsidiary Brands.</h2>
+              <ScrollLetters text="Our Diverse Subsidiary Brands." as="h2" className="text-4xl font-bold text-white mb-6" glow />
               <p className="text-indigo-200 max-w-3xl mx-auto">A thriving B2B and B2C marketplace ecosystem. Connect with our proprietary networks directly through your Central Command operator dashboard.</p>
             </div>
           </FadeIn>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {subsidiaryBrands.map((brand, idx) => (
               <FadeIn key={idx} delay={idx * 50} direction="scale">
-                <div className="bg-[#0b0e1b]/80 border border-fuchsia-900/30 rounded-xl p-6 hover:bg-[#13172e] hover:border-fuchsia-500/50 transition-all shadow-lg text-center h-full flex flex-col items-center justify-center">
-                  {brand.image ? (
-                    <div className="h-14 md:h-16 flex items-center justify-center mb-4">
-                      <img src={brand.image} alt={brand.name} className="max-h-full max-w-full object-contain drop-shadow-md" />
-                    </div>
-                  ) : (
-                    <div className="text-3xl mb-3">{brand.icon}</div>
-                  )}
-                  <h4 className="text-base font-bold text-white mb-2">{brand.name}</h4>
-                  <p className="text-xs text-indigo-300/70">{brand.desc}</p>
-                </div>
+                <Card3DTilt maxTilt={10} className="h-full">
+                  <div className="p-6 text-center h-full flex flex-col items-center justify-center">
+                    {brand.image ? (
+                      <div className="h-14 md:h-16 flex items-center justify-center mb-4">
+                        <img src={brand.image} alt={brand.name} className="max-h-full max-w-full object-contain drop-shadow-md" />
+                      </div>
+                    ) : (
+                      <div className="text-3xl mb-3">{brand.icon}</div>
+                    )}
+                    <h4 className="text-base font-bold text-white mb-2">{brand.name}</h4>
+                    <p className="text-xs text-indigo-300/70">{brand.desc}</p>
+                  </div>
+                </Card3DTilt>
               </FadeIn>
             ))}
           </div>
         </div>
       </section>
+
+      <SectionDivider accentColor="#06b6d4" />
 
       {/* --- HARDWARE & INFRASTRUCTURE --- */}
       <section id="hardware" className="py-24 border-b border-indigo-900/30 px-8 lg:px-12 bg-gradient-to-t from-[#060810] to-[#0d111f]/30 scroll-mt-24">
@@ -1411,7 +1653,7 @@ export default function CentralCommand() {
           <FadeIn>
             <div className="text-center mb-16">
               <h3 className="text-xs font-bold text-cyan-500 tracking-[0.2em] uppercase mb-4">Hardware Procurement</h3>
-              <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">Equipping your infrastructure.</h2>
+              <ScrollLetters text="Equipping your infrastructure." as="h2" className="text-4xl md:text-5xl font-bold text-white mb-6" glow />
               <p className="text-indigo-200 max-w-3xl mx-auto leading-relaxed">
                 Software requires robust physical foundations. We manage the full PC lifecycle and deploy cutting-edge hardware, backed by global technology partners.
               </p>
