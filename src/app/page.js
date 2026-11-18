@@ -10,7 +10,7 @@ import {
   Phone, Mail, MapPin,
   Building2, Landmark, ClipboardCheck, Cpu, Radio,
   Eye, EyeOff, Sparkles, Shield, ArrowRight,
-  Layers, Link2, Briefcase, Monitor
+  Layers, Link2, Briefcase, Monitor, ExternalLink
 } from 'lucide-react';
 
 import BrainsHoloCore from '@/components/animations/BrainsHoloCore';
@@ -1666,9 +1666,10 @@ export default function CentralCommand() {
                 <div className="aspect-video w-full bg-black relative">
                   <iframe
                     className="w-full h-full"
-                    src="https://www.youtube.com/embed/FwzdLd3bSx8?autoplay=1&mute=1"
-                    title="Millennium Interactive Board Demo"
+                    src="https://www.youtube.com/embed/-xQLNbygWh0"
+                    title="Millennium Dynamic Touch Panel Demo"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
                     allowFullScreen
                   />
                   <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md border border-cyan-500/50 text-cyan-400 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest pointer-events-none">
@@ -1678,7 +1679,17 @@ export default function CentralCommand() {
 
                 <div className="p-8 flex-grow flex flex-col justify-between">
                   <div>
-                    <h3 className="text-2xl font-bold text-white mb-3">Millennium Interactive Board</h3>
+                    <a
+                      href="https://millennium-brains.hytfoundationinterns-dreamacademy.workers.dev"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 group/title mb-3"
+                    >
+                      <h3 className="text-2xl font-bold text-white group-hover/title:text-cyan-400 transition-colors">
+                        Millennium Dynamic Touch Panel
+                      </h3>
+                      <ExternalLink className="w-5 h-5 text-cyan-400 opacity-80 group-hover/title:opacity-100 transition-opacity" />
+                    </a>
                     <p className="text-indigo-200 text-sm leading-relaxed mb-6">
                       The start of modern day technology. A dynamic touch panel with a 4K Ultra High-Definition display, an ultrawide angle camera for seamless online meetings, and embedded Windows/Android operating systems.
                     </p>
@@ -1688,12 +1699,23 @@ export default function CentralCommand() {
                     <li className="flex items-center"><span className="text-cyan-500 mr-2">✓</span> Immersive telepresence setup</li>
                     <li className="flex items-center"><span className="text-cyan-500 mr-2">✓</span> Wireless casting & Bluetooth ready</li>
                   </ul>
-                  <button 
-                    onClick={() => openInquiryModal('Millennium Interactive Board', 'Hardware')}
-                    className="w-full bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/50 text-cyan-300 font-bold py-3 rounded-lg transition-all"
-                  >
-                    Request Spec Sheet
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <a
+                      href="https://millennium-brains.hytfoundationinterns-dreamacademy.workers.dev"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-2 bg-cyan-600/30 hover:bg-cyan-500/40 border border-cyan-500/60 text-cyan-300 hover:text-white font-bold py-3 px-4 rounded-lg transition-all text-center text-sm shadow-md"
+                    >
+                      <span>Visit Website</span>
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                    <button 
+                      onClick={() => openInquiryModal('Millennium Interactive Board', 'Hardware')}
+                      className="flex-1 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/50 text-cyan-300 font-bold py-3 px-4 rounded-lg transition-all text-sm"
+                    >
+                      Request Spec Sheet
+                    </button>
+                  </div>
                 </div>
               </div>
             </FadeIn>

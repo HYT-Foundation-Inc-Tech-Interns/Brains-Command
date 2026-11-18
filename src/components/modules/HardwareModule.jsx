@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from 'react';
-import { Monitor, Settings } from 'lucide-react';
+import { Monitor, Settings, ExternalLink } from 'lucide-react';
 
 const hardwareProducts = [
   "Construction Auxiliaries", "Command Center", "GPS Tracker", "Accessories", "Auto Identification and Data Capture",
@@ -44,11 +44,32 @@ export function HardwareModule({ openInquiryModal }) {
               </div>
             <span className="px-3 py-1 bg-cyan-500/10 text-cyan-400 text-[10px] font-bold uppercase tracking-widest rounded-full border border-cyan-500/30">Flagship</span>
           </div>
-          <h4 className="text-lg font-bold text-white mb-2">Millennium Interactive Board</h4>
+          <a
+            href="https://millennium-brains.hytfoundationinterns-dreamacademy.workers.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 group/title mb-2"
+          >
+            <h4 className="text-lg font-bold text-white group-hover/title:text-cyan-400 transition-colors">
+              Millennium Interactive Board
+            </h4>
+            <ExternalLink className="w-4 h-4 text-cyan-400 opacity-80 group-hover/title:opacity-100 transition-opacity" />
+          </a>
           <p className="text-sm text-indigo-200/80 mb-6 flex-grow leading-relaxed">4K Ultra HD touch panel with embedded OS and telepresence camera for modern meeting rooms.</p>
-          <button onClick={() => openInquiryModal('Millennium Interactive Board', 'Hardware')} className="w-full py-2.5 bg-[#090b14] border border-indigo-700/50 text-cyan-400 text-xs font-bold rounded-xl hover:bg-cyan-900/40 hover:border-cyan-500/50 transition-colors shadow-sm">
-            Request Spec Sheet
-          </button>
+          <div className="flex gap-2">
+            <a
+              href="https://millennium-brains.hytfoundationinterns-dreamacademy.workers.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-1/2 py-2.5 text-center flex items-center justify-center gap-1.5 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/50 text-cyan-300 text-xs font-bold rounded-xl transition-all"
+            >
+              <span>Visit Site</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+            <button onClick={() => openInquiryModal('Millennium Interactive Board', 'Hardware')} className="w-1/2 py-2.5 bg-[#090b14] border border-indigo-700/50 text-cyan-400 text-xs font-bold rounded-xl hover:bg-cyan-900/40 hover:border-cyan-500/50 transition-colors shadow-sm">
+              Request Spec
+            </button>
+          </div>
         </div>
 
         <div className="bg-gradient-to-br from-[#13172e]/80 to-[#090b14]/80 border border-emerald-800/50 rounded-2xl p-6 shadow-lg flex flex-col group hover:border-emerald-500/50 transition-all backdrop-blur-sm">
