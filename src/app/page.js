@@ -874,7 +874,7 @@ const ParticleBackground = () => {
 // Starts VISIBLE so the server-rendered HTML is readable even when the client
 // bundle never runs. When client hydrates, smoothly transitions components IN
 // upon entering the viewport and OUT when leaving the viewport.
-const FadeIn = ({ children, delay = 0, direction = "up", inOut = true }) => {
+const FadeIn = ({ children, delay = 0, direction = "up", inOut = true, className = "" }) => {
   const [isVisible, setIsVisible] = useState(true);
   const domRef = useRef(null);
   const inOutRef = useRef(inOut);
@@ -931,7 +931,7 @@ const FadeIn = ({ children, delay = 0, direction = "up", inOut = true }) => {
   return (
     <div
       ref={domRef}
-      className={`${baseClasses} ${isVisible ? visibleClasses : hiddenClasses}`}
+      className={`${baseClasses} ${isVisible ? visibleClasses : hiddenClasses} ${className}`}
       style={{ transitionDelay: `${delay}ms` }}
     >
       {children}
@@ -1111,10 +1111,12 @@ const navLinks = [
 
 // --- Reusable Components ---
 const FeatureCard = ({ title, desc }) => (
-  <div className="bg-[#13172e]/80 backdrop-blur-sm border border-indigo-800/50 rounded-xl p-6 hover:border-fuchsia-500/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_20px_rgba(217,70,239,0.15)] shadow-lg">
-    <div className="w-2 h-2 bg-fuchsia-500 transform rotate-45 mb-4 shadow-[0_0_8px_rgba(217,70,239,0.5)]"></div>
-    <h4 className="text-sm font-bold text-white mb-2">{title}</h4>
-    <p className="text-xs text-indigo-200/80 leading-relaxed">{desc}</p>
+  <div className="h-full bg-[#13172e]/80 backdrop-blur-sm border border-indigo-800/50 rounded-xl p-6 hover:border-fuchsia-500/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_20px_rgba(217,70,239,0.15)] shadow-lg flex flex-col justify-between">
+    <div>
+      <div className="w-2 h-2 bg-fuchsia-500 transform rotate-45 mb-4 shadow-[0_0_8px_rgba(217,70,239,0.5)]"></div>
+      <h4 className="text-sm font-bold text-white mb-2">{title}</h4>
+      <p className="text-xs text-indigo-200/80 leading-relaxed">{desc}</p>
+    </div>
   </div>
 );
 
@@ -1160,7 +1162,7 @@ const ModuleSection = ({ data }) => (
       
       <div className="lg:col-span-8 grid md:grid-cols-2 gap-4">
         {data.features.map((feat, idx) => (
-          <FadeIn key={idx} delay={idx * 60}>
+          <FadeIn key={idx} delay={idx * 60} className="h-full">
             <FeatureCard title={feat.title} desc={feat.desc} />
           </FadeIn>
         ))}
@@ -1571,13 +1573,13 @@ export default function CentralCommand() {
               <ScrollLetters text="Tailored Agency Services for Business Expansion." as="h2" className="text-4xl md:text-5xl font-bold text-white max-w-2xl" glow />
             </div>
           </FadeIn>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
             {agencyServices.map((service, idx) => (
-              <FadeIn key={idx} delay={idx * 100}>
+              <FadeIn key={idx} delay={idx * 100} className="h-full">
                 <Card3DTilt maxTilt={8} className="h-full">
                   <div className={`overflow-hidden transition-all duration-500 h-full flex flex-col justify-between group`}>
                     
-                    <div className="w-full h-48 bg-[#090b14] overflow-hidden relative">
+                    <div className="w-full h-48 bg-[#090b14] overflow-hidden relative flex-shrink-0">
                       <img 
                         src={service.image} 
                         alt={service.title} 
@@ -1587,9 +1589,9 @@ export default function CentralCommand() {
                     </div>
 
                     <div className="p-8 pt-6 flex-grow flex flex-col justify-between">
-                      <div>
-                        <h4 className={`text-xl font-bold text-white mb-3 transition-colors ${service.textGlow}`}>{service.title}</h4>
-                        <p className="text-sm text-indigo-200/90 leading-relaxed mb-8">{service.desc}</p>
+                      <div className="flex-grow">
+                        <h4 className={`text-xl font-bold text-white mb-3 min-h-[1.75rem] transition-colors ${service.textGlow}`}>{service.title}</h4>
+                        <p className="text-sm text-indigo-200/90 leading-relaxed mb-6 min-h-[2.75rem]">{service.desc}</p>
                       </div>
                       
                       <div className="pt-4 border-t border-indigo-800/50 mt-auto">
@@ -1622,9 +1624,9 @@ export default function CentralCommand() {
               <p className="text-indigo-200 max-w-3xl mx-auto">A thriving B2B and B2C marketplace ecosystem. Connect with our proprietary networks directly through your Central Command operator dashboard.</p>
             </div>
           </FadeIn>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
             {subsidiaryBrands.map((brand, idx) => (
-              <FadeIn key={idx} delay={idx * 50} direction="scale">
+              <FadeIn key={idx} delay={idx * 50} direction="scale" className="h-full">
                 <Card3DTilt maxTilt={10} className="h-full">
                   <div className="p-6 text-center h-full flex flex-col items-center justify-center">
                     {brand.image ? (
@@ -1660,8 +1662,8 @@ export default function CentralCommand() {
             </div>
           </FadeIn>
 
-          <div className="grid lg:grid-cols-2 gap-8 mb-16">
-            <FadeIn delay={100}>
+          <div className="grid lg:grid-cols-2 gap-8 mb-16 items-stretch">
+            <FadeIn delay={100} className="h-full">
               <div className="bg-[#13172e]/60 border border-cyan-800/50 rounded-2xl overflow-hidden shadow-2xl h-full flex flex-col group">
                 <div className="aspect-video w-full bg-black relative">
                   <iframe
@@ -1720,7 +1722,7 @@ export default function CentralCommand() {
               </div>
             </FadeIn>
 
-            <FadeIn delay={200}>
+            <FadeIn delay={200} className="h-full">
               <div className="bg-[#13172e]/60 border border-emerald-800/50 rounded-2xl overflow-hidden shadow-2xl h-full flex flex-col group">
                 <div className="aspect-video w-full bg-[#090b14] relative flex items-center justify-center overflow-hidden">
                   <img src="/Thehco.png" alt="THEHCO Tech Device" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-transform duration-700 group-hover:scale-105" />

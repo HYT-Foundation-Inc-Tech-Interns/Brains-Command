@@ -63,10 +63,17 @@ export async function GET(req, { params }) {
     }
 
     // 6. Return combined customer profile with validation signals
+    const meta = authUser?.user_metadata || {};
+    const contactDetails = profile.phone || meta.contact_details || meta.phone || '';
+    const address = profile.address || meta.address || '';
+
     return NextResponse.json({
       success: true,
       customer: {
         ...profile,
+        contact_details: contactDetails,
+        phone: contactDetails,
+        address: address,
         subscribed_modules: activeModules,
         email_confirmed: !!authUser?.email_confirmed_at,
         email_confirmed_at: authUser?.email_confirmed_at || null,

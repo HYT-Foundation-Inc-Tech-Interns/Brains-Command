@@ -79,8 +79,15 @@ export async function GET(req) {
         // Remove the raw relational object and replace it with the array the frontend expects
         delete profile.user_subscriptions;
 
+        const meta = authUser?.user?.user_metadata || {};
+        const contactDetails = profile.phone || meta.contact_details || meta.phone || '';
+        const address = profile.address || meta.address || '';
+
         return {
           ...profile,
+          contact_details: contactDetails,
+          phone: contactDetails,
+          address: address,
           subscribed_modules: activeModules, // <-- This passes the array back to your frontend!
           email_confirmed: !!authUser?.user?.email_confirmed_at,
           last_sign_in: authUser?.user?.last_sign_in_at,
@@ -100,10 +107,11 @@ export async function GET(req) {
   }
 }
 
-// POST - Merged actions for Create Admin, Update Role, Delete User, and Cancel Subscription
+// POST - Merged actions for Create Admin, Update Admin, Update Role, Delete User, and Cancel Subscription
 export async function POST(req) {
   try {
-    const { action, userId, newRole, email, password, firstName, lastName } = await req.json();
+    const body = await req.json();
+    const { action, userId, newRole, email, password, firstName, lastName, fullName, contactDetails, phone, address } = body;
 
     if (!supabaseAdmin) {
       return NextResponse.json({ message: "Server configuration error" }, { status: 500 });
@@ -111,18 +119,36 @@ export async function POST(req) {
 
     // ACTION: CREATE ADMIN
     if (action === 'createAdmin') {
-      if (!email || !firstName) {
-        return NextResponse.json({ message: "Email and first name are required." }, { status: 400 });
+      let fName = firstName;
+      let lName = lastName;
+
+      if (fullName && (!fName || !lName)) {
+        const parts = fullName.trim().split(/\s+/);
+        fName = fName || parts[0];
+        lName = lName || parts.slice(1).join(' ');
+      }
+
+      if (!email || !fName) {
+        return NextResponse.json({ message: "Email and full name (or first name) are required." }, { status: 400 });
       }
 
       const normalizedEmail = email.trim().toLowerCase();
+      const contact = (contactDetails || phone || '').trim();
+      const addr = (address || '').trim();
       const tempPassword = password || generateTempPassword();
 
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: normalizedEmail,
         password: tempPassword,
         email_confirm: true,
-        user_metadata: { first_name: firstName, last_name: lastName || '', role: 'admin' }
+        user_metadata: {
+          first_name: fName,
+          last_name: lName || '',
+          phone: contact,
+          contact_details: contact,
+          address: addr,
+          role: 'admin'
+        }
       });
 
       if (authError) {
@@ -161,7 +187,7 @@ export async function POST(req) {
         await issueAdminCode({
           userId: existing.id,
           email: existing.email,
-          firstName: existing.first_name || firstName
+          firstName: existing.first_name || fName
         });
 
         return NextResponse.json(
@@ -173,27 +199,33 @@ export async function POST(req) {
       const newUserId = authData.user.id;
 
       try {
-        // The signup trigger normally creates this row; upsert covers both cases.
-        const { error: profileError } = await supabaseAdmin
-          .from('profiles')
-          .upsert(
-            {
-              id: newUserId,
-              first_name: firstName,
-              last_name: lastName || null,
-              email: normalizedEmail,
-              role: 'admin',
-              updated_at: new Date().toISOString()
-            },
-            { onConflict: 'id' }
-          );
+        const profileData = {
+          id: newUserId,
+          first_name: fName,
+          last_name: lName || null,
+          email: normalizedEmail,
+          role: 'admin',
+          updated_at: new Date().toISOString()
+        };
 
-        if (profileError) throw profileError;
+        // Attempt upsert with phone and address columns if available; gracefully fallback
+        try {
+          const { error: pErr } = await supabaseAdmin
+            .from('profiles')
+            .upsert({ ...profileData, phone: contact || null, address: addr || null }, { onConflict: 'id' });
+          if (pErr) {
+            const { error: fbErr } = await supabaseAdmin.from('profiles').upsert(profileData, { onConflict: 'id' });
+            if (fbErr) throw fbErr;
+          }
+        } catch {
+          const { error: fbErr } = await supabaseAdmin.from('profiles').upsert(profileData, { onConflict: 'id' });
+          if (fbErr) throw fbErr;
+        }
 
         await issueAdminCode({
           userId: newUserId,
           email: normalizedEmail,
-          firstName,
+          firstName: fName,
           tempPassword
         });
       } catch (provisionError) {
@@ -208,9 +240,123 @@ export async function POST(req) {
       }
 
       return NextResponse.json(
-        { message: "Administrator created. A one-time access code has been emailed.", userId: newUserId },
+        { message: "Administrator credentials created. A one-time access code has been emailed.", userId: newUserId },
         { status: 201 }
       );
+    }
+
+    // ACTION: UPDATE ADMIN CREDENTIALS
+    if (action === 'updateAdmin') {
+      if (!userId) {
+        return NextResponse.json({ message: "Administrator User ID is required." }, { status: 400 });
+      }
+
+      let fName = firstName;
+      let lName = lastName;
+      if (fullName && (!fName || !lName)) {
+        const parts = fullName.trim().split(/\s+/);
+        fName = fName || parts[0];
+        lName = lName || parts.slice(1).join(' ');
+      }
+
+      const normalizedEmail = email ? email.trim().toLowerCase() : undefined;
+      const contact = contactDetails !== undefined ? contactDetails.trim() : (phone !== undefined ? phone.trim() : undefined);
+      const addr = address !== undefined ? address.trim() : undefined;
+
+      // 1. Verify target is admin
+      const { data: existingProfile, error: fetchErr } = await supabaseAdmin
+        .from('profiles')
+        .select('id, email, first_name, last_name, role')
+        .eq('id', userId)
+        .single();
+
+      if (fetchErr || !existingProfile) {
+        return NextResponse.json({ message: "Administrator account not found." }, { status: 404 });
+      }
+
+      if (existingProfile.role !== 'admin') {
+        return NextResponse.json({ message: "Target account is not an administrator." }, { status: 403 });
+      }
+
+      // 2. Fetch existing auth user metadata
+      const { data: authData } = await supabaseAdmin.auth.admin.getUserById(userId);
+      const existingMeta = authData?.user?.user_metadata || {};
+
+      const updatedMeta = {
+        ...existingMeta,
+        first_name: fName !== undefined ? fName : (existingProfile.first_name || ''),
+        last_name: lName !== undefined ? lName : (existingProfile.last_name || ''),
+        role: 'admin'
+      };
+
+      if (contact !== undefined) {
+        updatedMeta.phone = contact;
+        updatedMeta.contact_details = contact;
+      }
+      if (addr !== undefined) {
+        updatedMeta.address = addr;
+      }
+
+      const authUpdatePayload = {
+        user_metadata: updatedMeta
+      };
+
+      if (normalizedEmail && normalizedEmail !== authData?.user?.email) {
+        authUpdatePayload.email = normalizedEmail;
+        authUpdatePayload.email_confirm = true;
+      }
+
+      const { error: authUpdateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, authUpdatePayload);
+      if (authUpdateErr) {
+        return NextResponse.json({ message: `Failed to update auth credentials: ${authUpdateErr.message}` }, { status: 500 });
+      }
+
+      // 3. Update public.profiles
+      const profileUpdates = {
+        first_name: updatedMeta.first_name,
+        last_name: updatedMeta.last_name,
+        updated_at: new Date().toISOString()
+      };
+      if (normalizedEmail) {
+        profileUpdates.email = normalizedEmail;
+      }
+
+      try {
+        const fullProfileUpdate = { ...profileUpdates };
+        if (contact !== undefined) fullProfileUpdate.phone = contact || null;
+        if (addr !== undefined) fullProfileUpdate.address = addr || null;
+        const { error: pErr } = await supabaseAdmin
+          .from('profiles')
+          .update(fullProfileUpdate)
+          .eq('id', userId);
+        if (pErr) {
+          const { error: fbErr } = await supabaseAdmin
+            .from('profiles')
+            .update(profileUpdates)
+            .eq('id', userId);
+          if (fbErr) throw fbErr;
+        }
+      } catch {
+        const { error: fbErr } = await supabaseAdmin
+          .from('profiles')
+          .update(profileUpdates)
+          .eq('id', userId);
+        if (fbErr) throw fbErr;
+      }
+
+      return NextResponse.json({
+        message: "Administrator credentials updated successfully.",
+        user: {
+          id: userId,
+          first_name: updatedMeta.first_name,
+          last_name: updatedMeta.last_name,
+          email: normalizedEmail || existingProfile.email,
+          contact_details: updatedMeta.contact_details,
+          phone: updatedMeta.phone,
+          address: updatedMeta.address,
+          role: 'admin'
+        }
+      }, { status: 200 });
     }
 
     // ACTION: UPDATE ROLE

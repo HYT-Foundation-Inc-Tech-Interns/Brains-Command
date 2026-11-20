@@ -9,6 +9,7 @@ import React, { useRef, useState } from 'react';
 export default function Card3DTilt({
   children,
   className = '',
+  containerClassName = '',
   maxTilt = 12,
   glowColor = 'rgba(217, 70, 239, 0.25)',
   borderColor = 'rgba(129, 140, 248, 0.3)',
@@ -46,10 +47,12 @@ export default function Card3DTilt({
     setRotate({ x: 0, y: 0 });
   };
 
+  const isFullHeight = className.includes('h-full') || containerClassName.includes('h-full');
+
   return (
     <div
       style={{ perspective: '1000px' }}
-      className="relative transition-transform duration-200 ease-out"
+      className={`relative transition-transform duration-200 ease-out ${isFullHeight ? 'h-full flex flex-col' : ''} ${containerClassName}`}
     >
       <div
         ref={cardRef}
@@ -65,7 +68,7 @@ export default function Card3DTilt({
           transition: isHovered ? 'transform 0.1s ease-out' : 'transform 0.5s ease-out',
           borderColor: active ? activeBorderColor : (isHovered ? activeBorderColor : borderColor),
         }}
-        className={`relative overflow-hidden rounded-2xl bg-[#13172e]/70 backdrop-blur-xl border shadow-xl ${className}`}
+        className={`relative overflow-hidden rounded-2xl bg-[#13172e]/70 backdrop-blur-xl border shadow-xl ${isFullHeight ? 'h-full flex flex-col' : ''} ${className}`}
       >
         {/* Specular Glare Effect - Follows cursor */}
         <div
@@ -86,7 +89,7 @@ export default function Card3DTilt({
           />
         )}
 
-        <div className="relative z-10 w-full h-full">
+        <div className={`relative z-10 w-full ${isFullHeight ? 'h-full flex-grow flex flex-col' : 'h-full'}`}>
           {children}
         </div>
       </div>

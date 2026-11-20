@@ -10,7 +10,8 @@ import {
   Server, Activity, Lock, Database, Power,
   Megaphone, Send, Upload, Loader2, Download,
   Camera, ZoomIn, ZoomOut, RotateCcw, X, User,
-  Sparkles, CheckCircle2, ArrowUpRight, Cpu
+  Sparkles, CheckCircle2, ArrowUpRight, Cpu,
+  Edit3, Phone, MapPin
 } from 'lucide-react';
 
 import SciFiTelemetryHUD from '@/components/animations/SciFiTelemetryHUD';
@@ -197,7 +198,9 @@ export default function AdminDashboard() {
   const [emailReplyModal, setEmailReplyModal] = useState(null);
   const [thread, setThread] = useState([]);
   const [threadLoading, setThreadLoading] = useState(false);
+  const [logReplyModal, setLogReplyModal] = useState(null);
   const [addAdminModal, setAddAdminModal] = useState(false);
+  const [editAdminModal, setEditAdminModal] = useState(null);
 
   // Filters & Processing
   const [processingId, setProcessingId] = useState(null);
@@ -212,13 +215,25 @@ export default function AdminDashboard() {
   const [gateCode, setGateCode] = useState('');
   const [gateMessage, setGateMessage] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
+  const [currentAdminId, setCurrentAdminId] = useState('');
 
-  // Administrator profile photo
-  const [adminProfile, setAdminProfile] = useState({ first_name: '', last_name: '', avatar_url: null });
+  // Administrator profile & credentials
+  const [adminProfile, setAdminProfile] = useState({ first_name: '', last_name: '', avatar_url: null, phone: '', contact_details: '', address: '' });
+  const [selfCredsForm, setSelfCredsForm] = useState({ first_name: '', last_name: '', email: '', contact_details: '', address: '' });
+  const [selfCredsSaving, setSelfCredsSaving] = useState(false);
+  const [selfCredsStatus, setSelfCredsStatus] = useState({ type: '', message: '' });
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [avatarStatus, setAvatarStatus] = useState({ type: '', message: '' });
   const [photoViewer, setPhotoViewer] = useState({ open: false, scale: 1, src: null });
   const avatarInputRef = useRef(null);
+
+  // Maintenance Alert Email Preview
+  const [maintenancePreviewModal, setMaintenancePreviewModal] = useState(false);
+  const [maintenancePreviewTab, setMaintenancePreviewTab] = useState('active'); // 'active' | 'restored'
+  const [maintenancePreviewData, setMaintenancePreviewData] = useState({ active: null, restored: null });
+  const [maintenancePreviewLoading, setMaintenancePreviewLoading] = useState(false);
+  const [maintenanceTestSending, setMaintenanceTestSending] = useState(false);
+  const [maintenanceTestNotice, setMaintenanceTestNotice] = useState('');
 
   // Email campaigns
   const [campaignDraft, setCampaignDraft] = useState({ subject: '', body: '', images: [] });
@@ -246,6 +261,7 @@ export default function AdminDashboard() {
       }
 
       setAdminEmail(session.user?.email || '');
+      setCurrentAdminId(session.user.id);
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -255,10 +271,25 @@ export default function AdminDashboard() {
 
       if (cancelled) return;
 
+      const userMeta = session.user?.user_metadata || {};
+      const phone = profile?.phone || userMeta.phone || userMeta.contact_details || '';
+      const address = profile?.address || userMeta.address || '';
+
       setAdminProfile({
-        first_name: profile?.first_name || '',
-        last_name: profile?.last_name || '',
+        first_name: profile?.first_name || userMeta.first_name || '',
+        last_name: profile?.last_name || userMeta.last_name || '',
         avatar_url: profile?.avatar_url || null,
+        phone,
+        contact_details: phone,
+        address,
+      });
+
+      setSelfCredsForm({
+        first_name: profile?.first_name || userMeta.first_name || '',
+        last_name: profile?.last_name || userMeta.last_name || '',
+        email: session.user?.email || '',
+        contact_details: phone,
+        address,
       });
 
       if (profile?.role !== 'admin') {
@@ -720,31 +751,45 @@ export default function AdminDashboard() {
       // 2. Update Database via Supabase
       await supabase.from('system_settings').update({ [dbKeyMap[settingKey]]: newValue }).eq('id', 1);
 
-      // 3. Trigger Customer Emails if Maintenance Mode is Activated
+      // 3. Trigger Customer Emails if Maintenance Mode is Activated or Restored
       if (settingKey === 'maintenanceMode') {
+        const customers = users.filter(u => u.role === 'customer');
+        const { data: { session } } = await supabase.auth.getSession();
+        const authHeaders = {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`
+        };
+
         if (newValue === true) {
-          const customers = users.filter(u => u.role === 'customer');
-          const { data: { session } } = await supabase.auth.getSession();
-          const authHeaders = {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session?.access_token}`
-          };
-          
-          // Dispatch emails asynchronously so it doesn't freeze the dashboard
+          // Dispatch high-fidelity maintenance alert emails asynchronously
           Promise.allSettled(customers.map(customer => 
             fetch('/api/admin/send-email', {
               method: 'POST',
               headers: authHeaders,
               body: JSON.stringify({
                 to: customer.email,
-                subject: "SYSTEM ALERT: Scheduled Maintenance Notification",
-                message: `Hello ${customer.first_name || 'Customer'},\n\nThis is an automated alert from Brains Central Command.\n\nThe platform has been placed into Maintenance Mode by our engineering team. During this time, some SaaS modules and integrations may experience brief interruptions or degraded performance.\n\nWe apologize for any inconvenience and will notify you once full system stability is restored.\n\nRegards,\nThe Brains Tech Team`
+                type: 'maintenance',
+                activated: true,
+                customerName: [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.first_name || 'Customer',
               })
             })
           ));
-          alert("Maintenance Mode Activated! Alert emails are being dispatched to all active customers.");
+          alert("Maintenance Mode Activated! High-priority scheduled maintenance alert emails are being dispatched to active customers.");
         } else {
-          alert("Maintenance Mode Deactivated. Systems returned to normal operation.");
+          // Dispatch systems restored all-clear notification emails
+          Promise.allSettled(customers.map(customer => 
+            fetch('/api/admin/send-email', {
+              method: 'POST',
+              headers: authHeaders,
+              body: JSON.stringify({
+                to: customer.email,
+                type: 'maintenance',
+                activated: false,
+                customerName: [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.first_name || 'Customer',
+              })
+            })
+          ));
+          alert("Maintenance Mode Deactivated. All-clear system restoration emails are being dispatched to active customers.");
         }
       }
 
@@ -767,13 +812,79 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleOpenMaintenancePreview = async (tab = 'active') => {
+    setMaintenancePreviewTab(tab);
+    setMaintenancePreviewModal(true);
+    setMaintenanceTestNotice('');
+
+    if (maintenancePreviewData[tab]) return;
+
+    setMaintenancePreviewLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({
+          preview: true,
+          type: 'maintenance',
+          activated: tab === 'active',
+          customerName: [adminProfile.first_name, adminProfile.last_name].filter(Boolean).join(' ') || 'Partner',
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMaintenancePreviewData(prev => ({ ...prev, [tab]: data }));
+      }
+    } catch (err) {
+      console.error('Failed to load maintenance email preview:', err);
+    } finally {
+      setMaintenancePreviewLoading(false);
+    }
+  };
+
+  const handleSendTestMaintenanceEmail = async () => {
+    if (!adminEmail) return;
+    setMaintenanceTestSending(true);
+    setMaintenanceTestNotice('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({
+          to: adminEmail,
+          type: 'maintenance',
+          activated: maintenancePreviewTab === 'active',
+          customerName: [adminProfile.first_name, adminProfile.last_name].filter(Boolean).join(' ') || 'Administrator (Test)',
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send test email.');
+      setMaintenanceTestNotice(`Sample ${maintenancePreviewTab === 'active' ? 'Active Alert' : 'Systems Restored'} email sent to ${adminEmail}!`);
+    } catch (err) {
+      setMaintenanceTestNotice(`Error: ${err.message}`);
+    } finally {
+      setMaintenanceTestSending(false);
+    }
+  };
+
   const handleCreateAdmin = async (e) => {
     e.preventDefault();
     setProcessingId('creating-admin');
     
-    const email = e.target.email.value;
-    const firstName = e.target.firstName.value;
-    const lastName = e.target.lastName.value;
+    const formData = new FormData(e.target);
+    const email = formData.get('email')?.trim();
+    const firstName = formData.get('firstName')?.trim();
+    const lastName = formData.get('lastName')?.trim();
+    const contactDetails = formData.get('contactDetails')?.trim() || '';
+    const address = formData.get('address')?.trim() || '';
     
     try {
       const res = await fetch('/api/admin/users', {
@@ -783,20 +894,104 @@ export default function AdminDashboard() {
           action: 'createAdmin',
           email,
           firstName,
-          lastName
+          lastName,
+          contactDetails,
+          address
         })
       });
       
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to create admin account.");
+      if (!res.ok) throw new Error(data.message || "Failed to create administrator credentials.");
 
-      alert(data.message || "Administrator created. A one-time access code has been emailed to them.");
+      alert(data.message || "Administrator credentials created. A one-time access code has been emailed to them.");
       setAddAdminModal(false);
       fetchUsers();
     } catch (err) {
       alert(`Error: ${err.message}`);
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  const handleUpdateAdmin = async (e) => {
+    e.preventDefault();
+    if (!editAdminModal) return;
+    setProcessingId(`updating-admin-${editAdminModal.id}`);
+    
+    const formData = new FormData(e.target);
+    const email = formData.get('email')?.trim();
+    const firstName = formData.get('firstName')?.trim();
+    const lastName = formData.get('lastName')?.trim();
+    const contactDetails = formData.get('contactDetails')?.trim() || '';
+    const address = formData.get('address')?.trim() || '';
+    
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updateAdmin',
+          userId: editAdminModal.id,
+          email,
+          firstName,
+          lastName,
+          contactDetails,
+          address
+        })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to update administrator credentials.");
+
+      alert(data.message || "Administrator credentials updated successfully.");
+      setEditAdminModal(null);
+      fetchUsers();
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleUpdateSelfCredentials = async (e) => {
+    e.preventDefault();
+    if (!currentAdminId) return;
+    setSelfCredsSaving(true);
+    setSelfCredsStatus({ type: '', message: '' });
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updateAdmin',
+          userId: currentAdminId,
+          email: selfCredsForm.email,
+          firstName: selfCredsForm.first_name,
+          lastName: selfCredsForm.last_name,
+          contactDetails: selfCredsForm.contact_details,
+          address: selfCredsForm.address,
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to update credentials.');
+
+      setSelfCredsStatus({ type: 'success', message: 'Your credentials have been updated successfully!' });
+      setAdminProfile(prev => ({
+        ...prev,
+        first_name: selfCredsForm.first_name,
+        last_name: selfCredsForm.last_name,
+        phone: selfCredsForm.contact_details,
+        contact_details: selfCredsForm.contact_details,
+        address: selfCredsForm.address,
+      }));
+      if (selfCredsForm.email) setAdminEmail(selfCredsForm.email);
+      fetchUsers();
+    } catch (err) {
+      setSelfCredsStatus({ type: 'error', message: err.message });
+    } finally {
+      setSelfCredsSaving(false);
     }
   };
 
@@ -964,6 +1159,36 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleLogCustomerReply = async (e) => {
+    e.preventDefault();
+    if (!logReplyModal) return;
+    setProcessingId('logging-reply');
+
+    try {
+      const res = await fetch('/api/admin/inquiries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'log_inbound',
+          inquiryId: logReplyModal.id,
+          message: e.target.replyMessage.value,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to log reply');
+
+      const targetId = logReplyModal.id;
+      setLogReplyModal(null);
+      await fetchThread(targetId);
+      await fetchInquiries();
+    } catch (err) {
+      alert(`Error logging reply: ${err.message}`);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const handleChangePassword = async (e) => {
     e.preventDefault();
     setPwStatus({ type: '', message: '' });
@@ -1038,7 +1263,13 @@ export default function AdminDashboard() {
     if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase();
       const fullName = `${user.first_name || ''} ${user.last_name || ''}`.toLowerCase();
-      if (!fullName.includes(query) && !(user.email || '').toLowerCase().includes(query) && !(user.company || '').toLowerCase().includes(query)) return false;
+      const phone = (user.contact_details || user.phone || '').toLowerCase();
+      const address = (user.address || '').toLowerCase();
+      if (!fullName.includes(query) && 
+          !(user.email || '').toLowerCase().includes(query) && 
+          !(user.company || '').toLowerCase().includes(query) &&
+          !phone.includes(query) &&
+          !address.includes(query)) return false;
     }
     return true;
   });
@@ -1050,6 +1281,8 @@ export default function AdminDashboard() {
       ['First Name', (u) => u.first_name],
       ['Last Name', (u) => u.last_name],
       ['Email', (u) => u.email],
+      ['Contact Details / Phone', (u) => u.contact_details || u.phone || ''],
+      ['Address', (u) => u.address || ''],
       ['Company', (u) => u.company],
       ['Role', (u) => u.role],
       ['Status', (u) => u.status || 'new'],
@@ -1377,273 +1610,423 @@ export default function AdminDashboard() {
 
           {/* SETTINGS TAB */}
           {activeTab === 'settings' && (
-            <div className="animate-fadeIn max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-              
-              {/* Left Column: Platform Controls & Health */}
-              <div className="lg:col-span-1 space-y-8">
+            <div className="animate-fadeIn max-w-[1600px] mx-auto space-y-8">
 
-                {/* Administrator Profile Photo */}
-                <div className="bg-[#13172e]/80 backdrop-blur-md border border-indigo-800/50 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[50px] pointer-events-none"></div>
-
-                  <h3 className="text-sm font-bold text-indigo-300 uppercase tracking-widest mb-1 flex items-center gap-2 relative z-10">
-                    <User className="w-4 h-4 text-indigo-400" /> Administrator Profile
-                  </h3>
-                  <p className="text-[11px] text-indigo-400/80 mb-5 relative z-10">
-                    This photo appears in the header of your command deck.
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-indigo-800/40 pb-5">
+                <div>
+                  <h2 className="text-2xl font-black text-white flex items-center gap-3">
+                    <Settings className="w-7 h-7 text-indigo-400" /> System Settings & Credentials
+                  </h2>
+                  <p className="text-xs text-indigo-300/80 font-mono mt-1">
+                    Configure administrator credentials, account security, and platform-wide governance.
                   </p>
-
-                  <div className="flex items-center gap-4 relative z-10">
-                    <button
-                      type="button"
-                      onClick={() => openPhotoViewer(adminProfile.avatar_url)}
-                      disabled={!adminProfile.avatar_url}
-                      title={adminProfile.avatar_url ? 'Click to view and zoom' : undefined}
-                      className="w-20 h-20 rounded-full overflow-hidden border border-indigo-700/60 bg-[#090b14] flex items-center justify-center shrink-0 transition-colors enabled:cursor-zoom-in enabled:hover:border-fuchsia-500/60 focus:outline-none focus:ring-1 focus:ring-fuchsia-500/50"
-                    >
-                      {adminProfile.avatar_url ? (
-                        <img src={adminProfile.avatar_url} alt="Admin profile photo" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-lg font-bold text-indigo-300">{adminInitials}</span>
-                      )}
-                    </button>
-
-                    <div className="flex flex-col items-start gap-2 min-w-0">
-                      <p className="text-sm font-bold text-white truncate w-full">
-                        {[adminProfile.first_name, adminProfile.last_name].filter(Boolean).join(' ') || 'Administrator'}
-                      </p>
-                      <p className="text-[11px] text-indigo-400/80 font-mono truncate w-full">{adminEmail}</p>
-
-                      <input
-                        ref={avatarInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp,image/gif"
-                        onChange={handleAvatarUpload}
-                        className="hidden"
-                      />
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => avatarInputRef.current?.click()}
-                          disabled={isUploadingAvatar}
-                          className="flex items-center gap-2 bg-fuchsia-600/20 hover:bg-fuchsia-600 border border-fuchsia-500/50 text-fuchsia-200 hover:text-white text-xs font-bold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
-                        >
-                          {isUploadingAvatar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-                          {isUploadingAvatar ? 'Uploading...' : (adminProfile.avatar_url ? 'Change Photo' : 'Upload Photo')}
-                        </button>
-                        {adminProfile.avatar_url && !isUploadingAvatar && (
-                          <button
-                            type="button"
-                            onClick={handleRemoveAvatar}
-                            className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 hover:text-fuchsia-400 transition-colors"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {avatarStatus.message && (
-                    <div className={`mt-4 text-[11px] font-semibold rounded-lg px-3 py-2 border relative z-10 ${avatarStatus.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
-                      {avatarStatus.message}
-                    </div>
-                  )}
                 </div>
-
-                {/* Account Security: change temporary password */}
-                <div className="bg-[#13172e]/80 backdrop-blur-md border border-indigo-800/50 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/10 rounded-full blur-[50px] pointer-events-none"></div>
-
-                  <h3 className="text-sm font-bold text-indigo-300 uppercase tracking-widest mb-1 flex items-center gap-2 relative z-10">
-                    <Lock className="w-4 h-4 text-fuchsia-400" /> Account Security
-                  </h3>
-                  <p className="text-[11px] text-indigo-400/80 mb-5 relative z-10">
-                    Replace the temporary password you were issued after signing in.
-                  </p>
-
-                  <form onSubmit={handleChangePassword} className="space-y-3 relative z-10">
-                    {[
-                      { key: 'current', label: 'Current / Temporary Password', autoComplete: 'current-password' },
-                      { key: 'next', label: 'New Password', autoComplete: 'new-password' },
-                      { key: 'confirm', label: 'Confirm New Password', autoComplete: 'new-password' },
-                    ].map((field) => (
-                      <div key={field.key}>
-                        <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">
-                          {field.label}
-                        </label>
-                        <input
-                          type="password"
-                          required
-                          minLength={field.key === 'current' ? undefined : 8}
-                          autoComplete={field.autoComplete}
-                          value={pwForm[field.key]}
-                          onChange={(e) => setPwForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                          className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/50"
-                          placeholder="••••••••"
-                        />
-                      </div>
-                    ))}
-
-                    {pwStatus.message && (
-                      <div className={`text-[11px] font-semibold rounded-lg px-3 py-2 border ${pwStatus.type === "success" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-red-500/10 border-red-500/30 text-red-400"}`}>
-                        {pwStatus.message}
-                      </div>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={pwSaving}
-                      className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-2.5 rounded-xl text-sm transition-all active:scale-95 disabled:opacity-50"
-                    >
-                      {pwSaving ? 'Updating...' : 'Update Password'}
-                    </button>
-                  </form>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono px-3 py-1.5 rounded-lg bg-indigo-950/80 border border-indigo-800/60 text-indigo-300">
+                    NODE: CENTRAL-US
+                  </span>
+                  <span className="text-[10px] font-mono px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    ONLINE
+                  </span>
                 </div>
-
-                {/* System Health Module */}
-                <div className="bg-[#13172e]/80 backdrop-blur-md border border-indigo-800/50 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-[50px] pointer-events-none"></div>
-                  <h3 className="text-sm font-bold text-indigo-300 uppercase tracking-widest mb-6 flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-emerald-400" /> System Health
-                  </h3>
-                  
-                  <div className="space-y-5 relative z-10">
-                    <div>
-                      <div className="flex justify-between text-xs mb-2">
-                        <span className="text-indigo-200 font-semibold flex items-center gap-2"><Database className="w-3.5 h-3.5" /> Supabase Edge</span>
-                        <span className="text-emerald-400 font-mono">14ms ping</span>
-                      </div>
-                      <div className="w-full bg-[#090b14] rounded-full h-1.5 border border-indigo-900/50">
-                        <div className="bg-emerald-500 h-1.5 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)]" style={{ width: '98%' }}></div>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <div className="flex justify-between text-xs mb-2">
-                        <span className="text-indigo-200 font-semibold flex items-center gap-2"><Server className="w-3.5 h-3.5" /> Vercel Compute</span>
-                        <span className="text-emerald-400 font-mono">Optimal</span>
-                      </div>
-                      <div className="w-full bg-[#090b14] rounded-full h-1.5 border border-indigo-900/50">
-                        <div className="bg-emerald-500 h-1.5 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)]" style={{ width: '85%' }}></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Core Settings Toggles */}
-                <div className="bg-[#13172e]/80 backdrop-blur-md border border-indigo-800/50 rounded-2xl p-6 shadow-xl">
-                  <h3 className="text-sm font-bold text-indigo-300 uppercase tracking-widest mb-6 flex items-center gap-2">
-                    <Power className="w-4 h-4 text-fuchsia-400" /> Global Controls
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-[#090b14]/50 border border-indigo-800/30 rounded-xl">
-                      <div>
-                        <div className="text-sm font-bold text-white">Maintenance Mode</div>
-                        <div className="text-[10px] text-indigo-400">Lock out non-admin users</div>
-                      </div>
-                      <button 
-                        disabled={settingsLoading}
-                        onClick={() => handleToggleSetting('maintenanceMode')}
-                        className={`w-12 h-6 rounded-full transition-all duration-300 relative p-1 shadow-inner ${platformSettings.maintenanceMode ? 'bg-amber-500 border border-amber-400' : 'bg-[#13172e] border border-indigo-700'}`}
-                      >
-                        <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-md ${platformSettings.maintenanceMode ? 'translate-x-6' : 'translate-x-0'}`} />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 bg-[#090b14]/50 border border-indigo-800/30 rounded-xl">
-                      <div>
-                        <div className="text-sm font-bold text-white">Allow Public Signups</div>
-                        <div className="text-[10px] text-indigo-400">Accept new SaaS trials</div>
-                      </div>
-                      <button 
-                        disabled={settingsLoading}
-                        onClick={() => handleToggleSetting('allowSignups')}
-                        className={`w-12 h-6 rounded-full transition-all duration-300 relative p-1 shadow-inner ${platformSettings.allowSignups ? 'bg-emerald-500 border border-emerald-400' : 'bg-[#13172e] border border-indigo-700'}`}
-                      >
-                        <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-md ${platformSettings.allowSignups ? 'translate-x-6' : 'translate-x-0'}`} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
               </div>
 
-              {/* Right Column: Security & Audit Logs */}
-              <div className="lg:col-span-2 space-y-8">
+              {/* 2-Column Responsive Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                 
-                {/* Security Configurations */}
-                <div className="bg-[#13172e]/80 backdrop-blur-md border border-indigo-800/50 rounded-2xl p-6 shadow-xl">
-                  <h3 className="text-sm font-bold text-indigo-300 uppercase tracking-widest mb-6 flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-blue-400" /> Security Policies
-                  </h3>
+                {/* --- COLUMN 1: ADMINISTRATOR IDENTITY & SECURITY --- */}
+                <div className="space-y-8">
                   
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <label className="flex items-start gap-3 p-4 bg-[#090b14]/50 border border-indigo-800/30 rounded-xl cursor-pointer hover:border-blue-500/50 transition-colors group">
-                      <input 
-                        type="checkbox" 
-                        checked={platformSettings.require2FA} 
-                        onChange={() => handleToggleSetting('require2FA')}
-                        className="mt-1 w-4 h-4 accent-blue-500" 
-                      />
-                      <div>
-                        <span className="text-sm font-bold text-white block">Require 2FA</span>
-                        <span className="text-xs text-indigo-400 block mt-1 leading-relaxed">Force all Administrators to use an authenticator app.</span>
-                      </div>
-                    </label>
+                  {/* Administrator Profile & Credentials Card */}
+                  <div className="bg-[#13172e]/80 backdrop-blur-md border border-indigo-800/50 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/10 rounded-full blur-[50px] pointer-events-none"></div>
 
-                    <label className="flex items-start gap-3 p-4 bg-[#090b14]/50 border border-indigo-800/30 rounded-xl cursor-pointer hover:border-blue-500/50 transition-colors group">
-                      <input 
-                        type="checkbox" 
-                        checked={platformSettings.emailAlerts} 
-                        onChange={() => handleToggleSetting('emailAlerts')}
-                        className="mt-1 w-4 h-4 accent-blue-500" 
-                      />
+                    <div className="flex items-start justify-between mb-5 relative z-10">
                       <div>
-                        <span className="text-sm font-bold text-white block">IP Anomaly Alerts</span>
-                        <span className="text-xs text-indigo-400 block mt-1 leading-relaxed">Email tier-1 admins upon login from unknown networks.</span>
+                        <h3 className="text-sm font-bold text-indigo-300 uppercase tracking-widest flex items-center gap-2">
+                          <User className="w-4 h-4 text-fuchsia-400" /> Administrator Profile & Credentials
+                        </h3>
+                        <p className="text-[11px] text-indigo-400/80 mt-1">
+                          Manage your administrator photo, full name, email, contact details, and office address.
+                        </p>
                       </div>
-                    </label>
-                  </div>
-                </div>
+                    </div>
 
-                {/* Live Audit Log Ledger */}
-                <div className="bg-[#13172e]/80 backdrop-blur-md border border-indigo-800/50 rounded-2xl flex flex-col shadow-xl overflow-hidden h-[400px]">
-                  <div className="px-6 py-4 border-b border-indigo-800/50 bg-[#090b14]/50 flex justify-between items-center">
-                    <h3 className="text-sm font-bold text-indigo-300 uppercase tracking-widest flex items-center gap-2">
-                      <ShieldAlert className="w-4 h-4 text-fuchsia-400" /> System Audit Ledger
-                    </h3>
-                    <span className="text-[10px] font-mono text-indigo-400 bg-[#13172e] px-2 py-1 rounded border border-indigo-800/50">LIVE</span>
-                  </div>
-                  
-                  <div className="flex-1 overflow-y-auto p-2 connector-scrollbar">
-                    {systemLogs.length > 0 ? (
-                      <div className="space-y-1">
-                        {systemLogs.map((log) => (
-                          <div key={log.id} className="flex items-start gap-3 p-3 hover:bg-[#090b14]/40 rounded-lg transition-colors border border-transparent hover:border-indigo-800/30">
-                            <span className="text-[10px] font-mono text-indigo-400/60 min-w-[70px] mt-0.5">{log.time}</span>
-                            <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                              log.type === 'error' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]' :
-                              log.type === 'warning' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]' :
-                              log.type === 'success' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' :
-                              'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]'
-                            }`}></span>
-                            <div>
-                              <p className="text-sm font-bold text-indigo-100">{log.action}</p>
-                              <p className="text-xs text-indigo-400/80 mt-0.5">{log.details}</p>
-                            </div>
-                          </div>
-                        ))}
+                    {/* Avatar Row */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl bg-[#090b14]/60 border border-indigo-800/40 mb-6 relative z-10">
+                      <button
+                        type="button"
+                        onClick={() => openPhotoViewer(adminProfile.avatar_url)}
+                        disabled={!adminProfile.avatar_url}
+                        title={adminProfile.avatar_url ? 'Click to view and zoom' : undefined}
+                        className="w-16 h-16 rounded-full overflow-hidden border-2 border-indigo-700/80 hover:border-fuchsia-500/80 bg-[#090b14] flex items-center justify-center shrink-0 transition-all enabled:cursor-zoom-in shadow-md"
+                      >
+                        {adminProfile.avatar_url ? (
+                          <img src={adminProfile.avatar_url} alt="Admin profile photo" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-base font-bold text-indigo-300">{adminInitials}</span>
+                        )}
+                      </button>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-white truncate">
+                          {[adminProfile.first_name, adminProfile.last_name].filter(Boolean).join(' ') || 'Administrator'}
+                        </p>
+                        <p className="text-xs text-indigo-400/80 font-mono truncate">{adminEmail}</p>
+
+                        <div className="flex items-center gap-3 mt-2.5">
+                          <input
+                            ref={avatarInputRef}
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/gif"
+                            onChange={handleAvatarUpload}
+                            className="hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => avatarInputRef.current?.click()}
+                            disabled={isUploadingAvatar}
+                            className="flex items-center gap-2 bg-fuchsia-600/20 hover:bg-fuchsia-600 border border-fuchsia-500/50 text-fuchsia-200 hover:text-white text-xs font-bold py-1.5 px-3.5 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                          >
+                            {isUploadingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                            {isUploadingAvatar ? 'Uploading...' : (adminProfile.avatar_url ? 'Change Photo' : 'Upload Photo')}
+                          </button>
+                          {adminProfile.avatar_url && !isUploadingAvatar && (
+                            <button
+                              type="button"
+                              onClick={handleRemoveAvatar}
+                              className="text-[11px] font-bold uppercase tracking-widest text-indigo-400 hover:text-fuchsia-400 transition-colors cursor-pointer"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-sm text-indigo-400/60 italic">
-                        No recent system events detected.
+                    </div>
+
+                    {avatarStatus.message && (
+                      <div className={`mb-5 text-[11px] font-semibold rounded-lg px-3 py-2 border relative z-10 ${avatarStatus.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                        {avatarStatus.message}
                       </div>
                     )}
+
+                    {/* Self Credentials Form */}
+                    <form onSubmit={handleUpdateSelfCredentials} className="space-y-4 relative z-10">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        <div>
+                          <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">First Name *</label>
+                          <input
+                            type="text"
+                            required
+                            value={selfCredsForm.first_name}
+                            onChange={(e) => setSelfCredsForm(prev => ({ ...prev, first_name: e.target.value }))}
+                            className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50"
+                            placeholder="First Name"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">Last Name *</label>
+                          <input
+                            type="text"
+                            required
+                            value={selfCredsForm.last_name}
+                            onChange={(e) => setSelfCredsForm(prev => ({ ...prev, last_name: e.target.value }))}
+                            className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50"
+                            placeholder="Last Name"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">Corporate Email *</label>
+                        <input
+                          type="email"
+                          required
+                          value={selfCredsForm.email}
+                          onChange={(e) => setSelfCredsForm(prev => ({ ...prev, email: e.target.value }))}
+                          className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50"
+                          placeholder="admin@brainscentral.com"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        <div>
+                          <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                            <Phone className="w-3 h-3 text-fuchsia-400" /> Contact Details / Phone
+                          </label>
+                          <input
+                            type="tel"
+                            placeholder="+63 900 000 0000"
+                            value={selfCredsForm.contact_details}
+                            onChange={(e) => setSelfCredsForm(prev => ({ ...prev, contact_details: e.target.value }))}
+                            className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                            <MapPin className="w-3 h-3 text-fuchsia-400" /> Office / Residential Address
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. BGC, Taguig City"
+                            value={selfCredsForm.address}
+                            onChange={(e) => setSelfCredsForm(prev => ({ ...prev, address: e.target.value }))}
+                            className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50"
+                          />
+                        </div>
+                      </div>
+
+                      {selfCredsStatus.message && (
+                        <div className={`text-[11px] font-semibold rounded-lg px-3 py-2 border ${selfCredsStatus.type === "success" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-red-500/10 border-red-500/30 text-red-400"}`}>
+                          {selfCredsStatus.message}
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={selfCredsSaving}
+                        className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-2.5 rounded-xl text-sm transition-all active:scale-95 disabled:opacity-50 shadow-md cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {selfCredsSaving ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Updating Credentials...
+                          </>
+                        ) : (
+                          'Update My Credentials'
+                        )}
+                      </button>
+                    </form>
                   </div>
+
+                  {/* Account Security Card: Change Password */}
+                  <div className="bg-[#13172e]/80 backdrop-blur-md border border-indigo-800/50 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/10 rounded-full blur-[50px] pointer-events-none"></div>
+
+                    <h3 className="text-sm font-bold text-indigo-300 uppercase tracking-widest mb-1 flex items-center gap-2 relative z-10">
+                      <Lock className="w-4 h-4 text-fuchsia-400" /> Account Security
+                    </h3>
+                    <p className="text-[11px] text-indigo-400/80 mb-5 relative z-10">
+                      Replace the temporary password you were issued after signing in.
+                    </p>
+
+                    <form onSubmit={handleChangePassword} className="space-y-3.5 relative z-10">
+                      {[
+                        { key: 'current', label: 'Current / Temporary Password', autoComplete: 'current-password' },
+                        { key: 'next', label: 'New Password', autoComplete: 'new-password' },
+                        { key: 'confirm', label: 'Confirm New Password', autoComplete: 'new-password' },
+                      ].map((field) => (
+                        <div key={field.key}>
+                          <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">
+                            {field.label}
+                          </label>
+                          <input
+                            type="password"
+                            required
+                            minLength={field.key === 'current' ? undefined : 8}
+                            autoComplete={field.autoComplete}
+                            value={pwForm[field.key]}
+                            onChange={(e) => setPwForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                            className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/50"
+                            placeholder="••••••••"
+                          />
+                        </div>
+                      ))}
+
+                      {pwStatus.message && (
+                        <div className={`text-[11px] font-semibold rounded-lg px-3 py-2 border ${pwStatus.type === "success" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-red-500/10 border-red-500/30 text-red-400"}`}>
+                          {pwStatus.message}
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={pwSaving}
+                        className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-2.5 rounded-xl text-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {pwSaving ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Updating Password...
+                          </>
+                        ) : (
+                          'Update Password'
+                        )}
+                      </button>
+                    </form>
+                  </div>
+
                 </div>
 
+                {/* --- COLUMN 2: PLATFORM GOVERNANCE, HEALTH & AUDIT LOGS --- */}
+                <div className="space-y-8">
+
+                  {/* Global Controls & Security Policies */}
+                  <div className="bg-[#13172e]/80 backdrop-blur-md border border-indigo-800/50 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-[50px] pointer-events-none"></div>
+
+                    <h3 className="text-sm font-bold text-indigo-300 uppercase tracking-widest mb-1 flex items-center gap-2 relative z-10">
+                      <Power className="w-4 h-4 text-fuchsia-400" /> Global Platform Controls & Policies
+                    </h3>
+                    <p className="text-[11px] text-indigo-400/80 mb-5 relative z-10">
+                      Manage global runtime modes, client onboarding switches, and admin authentication rules.
+                    </p>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10">
+                      
+                      {/* Maintenance Mode */}
+                      <div className="flex items-center justify-between p-3.5 bg-[#090b14]/60 border border-indigo-800/30 rounded-xl hover:border-indigo-700/50 transition-colors">
+                        <div>
+                          <div className="text-sm font-bold text-white flex items-center gap-2">
+                            Maintenance Mode
+                            {platformSettings.maintenanceMode && (
+                              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                            )}
+                          </div>
+                          <div className="text-[10px] text-indigo-400/90 mt-0.5">Lock out non-admin users</div>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenMaintenancePreview(platformSettings.maintenanceMode ? 'restored' : 'active')}
+                            className="mt-2 text-[10px] font-bold text-amber-400/90 hover:text-amber-300 transition-colors flex items-center gap-1 cursor-pointer underline-offset-2 hover:underline"
+                          >
+                            <Mail className="w-3 h-3" /> Preview Alert Email
+                          </button>
+                        </div>
+                        <button 
+                          disabled={settingsLoading}
+                          onClick={() => handleToggleSetting('maintenanceMode')}
+                          className={`w-12 h-6 rounded-full transition-all duration-300 relative p-1 shadow-inner shrink-0 cursor-pointer ${platformSettings.maintenanceMode ? 'bg-amber-500 border border-amber-400' : 'bg-[#13172e] border border-indigo-700'}`}
+                        >
+                          <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-md ${platformSettings.maintenanceMode ? 'translate-x-6' : 'translate-x-0'}`} />
+                        </button>
+                      </div>
+
+                      {/* Allow Public Signups */}
+                      <div className="flex items-center justify-between p-3.5 bg-[#090b14]/60 border border-indigo-800/30 rounded-xl hover:border-indigo-700/50 transition-colors">
+                        <div>
+                          <div className="text-sm font-bold text-white">Allow Public Signups</div>
+                          <div className="text-[10px] text-indigo-400/90 mt-0.5">Accept new SaaS trials</div>
+                        </div>
+                        <button 
+                          disabled={settingsLoading}
+                          onClick={() => handleToggleSetting('allowSignups')}
+                          className={`w-12 h-6 rounded-full transition-all duration-300 relative p-1 shadow-inner shrink-0 cursor-pointer ${platformSettings.allowSignups ? 'bg-emerald-500 border border-emerald-400' : 'bg-[#13172e] border border-indigo-700'}`}
+                        >
+                          <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-md ${platformSettings.allowSignups ? 'translate-x-6' : 'translate-x-0'}`} />
+                        </button>
+                      </div>
+
+                      {/* Require 2FA */}
+                      <div className="flex items-center justify-between p-3.5 bg-[#090b14]/60 border border-indigo-800/30 rounded-xl hover:border-indigo-700/50 transition-colors">
+                        <div>
+                          <div className="text-sm font-bold text-white">Require 2FA</div>
+                          <div className="text-[10px] text-indigo-400/90 mt-0.5">Force authenticator app</div>
+                        </div>
+                        <button 
+                          disabled={settingsLoading}
+                          onClick={() => handleToggleSetting('require2FA')}
+                          className={`w-12 h-6 rounded-full transition-all duration-300 relative p-1 shadow-inner shrink-0 cursor-pointer ${platformSettings.require2FA ? 'bg-blue-500 border border-blue-400' : 'bg-[#13172e] border border-indigo-700'}`}
+                        >
+                          <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-md ${platformSettings.require2FA ? 'translate-x-6' : 'translate-x-0'}`} />
+                        </button>
+                      </div>
+
+                      {/* IP Anomaly Alerts */}
+                      <div className="flex items-center justify-between p-3.5 bg-[#090b14]/60 border border-indigo-800/30 rounded-xl hover:border-indigo-700/50 transition-colors">
+                        <div>
+                          <div className="text-sm font-bold text-white">IP Anomaly Alerts</div>
+                          <div className="text-[10px] text-indigo-400/90 mt-0.5">Email on unknown login</div>
+                        </div>
+                        <button 
+                          disabled={settingsLoading}
+                          onClick={() => handleToggleSetting('emailAlerts')}
+                          className={`w-12 h-6 rounded-full transition-all duration-300 relative p-1 shadow-inner shrink-0 cursor-pointer ${platformSettings.emailAlerts ? 'bg-blue-500 border border-blue-400' : 'bg-[#13172e] border border-indigo-700'}`}
+                        >
+                          <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-md ${platformSettings.emailAlerts ? 'translate-x-6' : 'translate-x-0'}`} />
+                        </button>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* System Health Module */}
+                  <div className="bg-[#13172e]/80 backdrop-blur-md border border-indigo-800/50 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-[50px] pointer-events-none"></div>
+                    
+                    <div className="flex items-center justify-between mb-5 relative z-10">
+                      <h3 className="text-sm font-bold text-indigo-300 uppercase tracking-widest flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-emerald-400" /> System Health & Latency
+                      </h3>
+                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        HEALTHY
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-5 relative z-10">
+                      <div>
+                        <div className="flex justify-between text-xs mb-2">
+                          <span className="text-indigo-200 font-semibold flex items-center gap-2"><Database className="w-3.5 h-3.5 text-indigo-400" /> Supabase Edge Infrastructure</span>
+                          <span className="text-emerald-400 font-mono font-bold">14ms ping</span>
+                        </div>
+                        <div className="w-full bg-[#090b14] rounded-full h-1.5 border border-indigo-900/50">
+                          <div className="bg-emerald-500 h-1.5 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)]" style={{ width: '98%' }}></div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <div className="flex justify-between text-xs mb-2">
+                          <span className="text-indigo-200 font-semibold flex items-center gap-2"><Server className="w-3.5 h-3.5 text-indigo-400" /> Vercel Serverless Compute Cluster</span>
+                          <span className="text-emerald-400 font-mono font-bold">Optimal</span>
+                        </div>
+                        <div className="w-full bg-[#090b14] rounded-full h-1.5 border border-indigo-900/50">
+                          <div className="bg-emerald-500 h-1.5 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)]" style={{ width: '85%' }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Audit Log Ledger */}
+                  <div className="bg-[#13172e]/80 backdrop-blur-md border border-indigo-800/50 rounded-2xl flex flex-col shadow-xl overflow-hidden h-[340px]">
+                    <div className="px-6 py-4 border-b border-indigo-800/50 bg-[#090b14]/50 flex justify-between items-center">
+                      <h3 className="text-sm font-bold text-indigo-300 uppercase tracking-widest flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4 text-fuchsia-400" /> System Audit Ledger
+                      </h3>
+                      <span className="text-[10px] font-mono text-indigo-400 bg-[#13172e] px-2 py-1 rounded border border-indigo-800/50 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                        LIVE
+                      </span>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-3 connector-scrollbar">
+                      {systemLogs.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {systemLogs.map((log) => (
+                            <div key={log.id} className="flex items-start gap-3 p-2.5 hover:bg-[#090b14]/40 rounded-lg transition-colors border border-transparent hover:border-indigo-800/30">
+                              <span className="text-[10px] font-mono text-indigo-400/60 min-w-[70px] mt-0.5">{log.time}</span>
+                              <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                                log.type === 'error' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]' :
+                                log.type === 'warning' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]' :
+                                log.type === 'success' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' :
+                                'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]'
+                              }`}></span>
+                              <div>
+                                <p className="text-sm font-bold text-indigo-100">{log.action}</p>
+                                <p className="text-xs text-indigo-400/80 mt-0.5">{log.details}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-sm text-indigo-400/60 italic">
+                          No recent system events detected.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
               </div>
             </div>
           )}
@@ -1755,19 +2138,31 @@ export default function AdminDashboard() {
 
                       {campaignDraft.images.length > 0 && (
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
-                          {campaignDraft.images.map((url) => (
-                            <div key={url} className="relative group rounded-xl overflow-hidden border border-indigo-800/60 bg-[#090b14]">
-                              <img src={url} alt="" className="w-full h-24 object-cover" />
-                              <button
-                                type="button"
-                                onClick={() => setCampaignDraft((prev) => ({ ...prev, images: prev.images.filter((item) => item !== url) }))}
-                                className="absolute top-1.5 right-1.5 bg-[#090b14]/90 border border-red-500/50 text-red-400 rounded-full p-1 hover:bg-red-500 hover:text-white transition-all"
-                                title="Remove image"
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ))}
+                          {campaignDraft.images.map((url) => {
+                            const previewSrc = url.includes('/api/public/campaign-assets/')
+                              ? `https://jomuqhnqwimnuwikvaig.supabase.co/storage/v1/object/public/email-assets/${url.split('/api/public/campaign-assets/')[1].split('?')[0]}`
+                              : url;
+                            return (
+                              <div key={url} className="relative group rounded-xl overflow-hidden border border-indigo-800/60 bg-[#090b14] flex items-center justify-center min-h-[96px]">
+                                <img
+                                  src={previewSrc}
+                                  alt="Campaign preview"
+                                  className="w-full h-24 object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.classList.add('hidden');
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setCampaignDraft((prev) => ({ ...prev, images: prev.images.filter((item) => item !== url) }))}
+                                  className="absolute top-1.5 right-1.5 bg-[#090b14]/90 border border-red-500/50 text-red-400 rounded-full p-1 hover:bg-red-500 hover:text-white transition-all shadow-md z-10"
+                                  title="Remove image"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -2007,7 +2402,7 @@ export default function AdminDashboard() {
                       onClick={() => setAddAdminModal(true)}
                       className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-sm font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all shadow-[0_0_15px_rgba(217,70,239,0.3)] active:scale-95 whitespace-nowrap"
                     >
-                      <Plus className="w-4 h-4"/> Add Admin
+                      <Plus className="w-4 h-4"/> Add Admin Credentials
                     </button>
                   )}
 
@@ -2093,7 +2488,7 @@ export default function AdminDashboard() {
                     <thead className="bg-[#090b14]/50 sticky top-0 z-10 backdrop-blur-md">
                       <tr>
                         <th className="px-6 py-4 text-xs font-bold text-indigo-300 uppercase tracking-wider">User</th>
-                        <th className="px-6 py-4 text-xs font-bold text-indigo-300 uppercase tracking-wider">Contact</th>
+                        <th className="px-6 py-4 text-xs font-bold text-indigo-300 uppercase tracking-wider">{activeTab === 'admins' ? 'Credentials / Contact' : 'Contact'}</th>
                         <th className="px-6 py-4 text-xs font-bold text-indigo-300 uppercase tracking-wider">Role</th>
                         
                         {activeTab === 'customers' && (
@@ -2163,11 +2558,31 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-6 py-5 whitespace-nowrap">
                           <div className="text-sm text-indigo-200 flex items-center gap-2">
-                            <Mail className="w-3 h-3 opacity-50"/> {user.email}
+                            <Mail className="w-3.5 h-3.5 opacity-60 text-fuchsia-400 shrink-0"/> {user.email}
                           </div>
-                          <div className="text-xs text-indigo-400/70 mt-1 uppercase tracking-wider">
-                            {user.company || 'Independent'}
-                          </div>
+                          {activeTab === 'admins' ? (
+                            <div className="space-y-1 mt-1.5">
+                              {(user.contact_details || user.phone) ? (
+                                <div className="text-xs text-emerald-400 flex items-center gap-1.5 font-mono">
+                                  <Phone className="w-3 h-3 opacity-80 shrink-0 text-emerald-400"/>
+                                  <span>{user.contact_details || user.phone}</span>
+                                </div>
+                              ) : null}
+                              {user.address ? (
+                                <div className="text-xs text-cyan-300/90 flex items-center gap-1.5 max-w-[240px] truncate" title={user.address}>
+                                  <MapPin className="w-3 h-3 opacity-80 shrink-0 text-cyan-400"/>
+                                  <span className="truncate">{user.address}</span>
+                                </div>
+                              ) : null}
+                              {!user.contact_details && !user.phone && !user.address && (
+                                <div className="text-[11px] text-indigo-400/50 italic">No phone / address set</div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-indigo-400/70 mt-1 uppercase tracking-wider">
+                              {user.company || 'Independent'}
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-5 whitespace-nowrap">
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${user.role === 'admin' ? 'bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'}`}>
@@ -2218,6 +2633,18 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-6 py-5 whitespace-nowrap text-sm font-medium text-right">
                           <div className="flex items-center justify-end gap-2">
+
+                            {activeTab === 'admins' && (
+                              <button
+                                onClick={() => setEditAdminModal(user)}
+                                disabled={processingId === user.id}
+                                className="bg-fuchsia-600/20 hover:bg-fuchsia-500/40 border border-fuchsia-500/50 text-fuchsia-300 hover:text-white text-xs font-bold py-1.5 px-3 rounded-lg transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-sm"
+                                title="Edit Admin Credentials"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                <span>Edit</span>
+                              </button>
+                            )}
                             
                             {activeTab === 'customers' && (
                               <Link
@@ -2392,37 +2819,90 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* --- ADD ADMIN MODAL --- */}
+      {/* --- ADD ADMIN CREDENTIALS MODAL --- */}
       {addAdminModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-[#090b14]/80 backdrop-blur-sm cursor-pointer" onClick={() => setAddAdminModal(false)}></div>
-          <form onSubmit={handleCreateAdmin} className="relative w-full max-w-md bg-[#13172e] border border-fuchsia-500/50 rounded-2xl p-6 md:p-8 z-10 shadow-[0_0_40px_rgba(217,70,239,0.25)]">
+          <form onSubmit={handleCreateAdmin} className="relative w-full max-w-lg bg-[#13172e] border border-fuchsia-500/50 rounded-2xl p-6 md:p-8 z-10 shadow-[0_0_40px_rgba(217,70,239,0.25)]">
             <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-2">
-              <ShieldAlert className="w-6 h-6 text-fuchsia-500"/> Add Administrator
+              <ShieldAlert className="w-6 h-6 text-fuchsia-500"/> Add Admin Credentials
             </h3>
-            <p className="text-xs text-indigo-300/80 mb-6">Create a new admin account. A secure temporary password and a one-time access code will be emailed to them. They must enter the code once before the dashboard unlocks.</p>
+            <p className="text-xs text-indigo-300/80 mb-6">Create new administrator credentials with Full Name, Contact Details, Email, and Address. A secure temporary password and one-time access code will be emailed.</p>
 
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">First Name</label>
-                  <input name="firstName" required className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50" />
+                  <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">First Name *</label>
+                  <input name="firstName" required placeholder="e.g. Elena" className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">Last Name</label>
-                  <input name="lastName" required className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50" />
+                  <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">Last Name *</label>
+                  <input name="lastName" required placeholder="e.g. Rostova" className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50" />
                 </div>
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">Corporate Email</label>
-                <input name="email" type="email" required className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50" />
+                <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">Corporate Email *</label>
+                <input name="email" type="email" required placeholder="admin@brains.io" className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">Contact Details / Phone</label>
+                <input name="contactDetails" type="tel" placeholder="+63 900 000 0000" className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">Office / Residential Address</label>
+                <input name="address" type="text" placeholder="e.g. One Bonifacio High Street, BGC, Taguig City" className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50" />
               </div>
             </div>
 
             <div className="mt-8 pt-4 border-t border-indigo-800/50 flex gap-3 justify-end">
-               <button type="button" onClick={() => setAddAdminModal(false)} className="px-5 py-2.5 text-sm font-bold text-indigo-300 hover:text-white transition-colors">Cancel</button>
-               <button type="submit" disabled={processingId === 'creating-admin'} className="bg-fuchsia-600 text-white px-8 py-2.5 rounded-xl text-sm font-bold shadow-lg hover:shadow-fuchsia-500/25 active:scale-95 transition-all disabled:opacity-50">
+               <button type="button" onClick={() => setAddAdminModal(false)} className="px-5 py-2.5 text-sm font-bold text-indigo-300 hover:text-white transition-colors cursor-pointer">Cancel</button>
+               <button type="submit" disabled={processingId === 'creating-admin'} className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-8 py-2.5 rounded-xl text-sm font-bold shadow-lg hover:shadow-fuchsia-500/25 active:scale-95 transition-all disabled:opacity-50 cursor-pointer">
                  {processingId === 'creating-admin' ? 'Creating...' : 'Create & Send Email'}
+               </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* --- EDIT ADMIN CREDENTIALS MODAL --- */}
+      {editAdminModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-[#090b14]/80 backdrop-blur-sm cursor-pointer" onClick={() => setEditAdminModal(null)}></div>
+          <form onSubmit={handleUpdateAdmin} className="relative w-full max-w-lg bg-[#13172e] border border-fuchsia-500/50 rounded-2xl p-6 md:p-8 z-10 shadow-[0_0_40px_rgba(217,70,239,0.25)]">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-2">
+              <Edit3 className="w-6 h-6 text-fuchsia-500"/> Edit Admin Credentials
+            </h3>
+            <p className="text-xs text-indigo-300/80 mb-6">Modify administrator credentials for {editAdminModal.first_name} {editAdminModal.last_name}. Changes to Full Name, Contact Details, Email, and Address sync across database records.</p>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">First Name *</label>
+                  <input name="firstName" required defaultValue={editAdminModal.first_name || ''} className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">Last Name *</label>
+                  <input name="lastName" required defaultValue={editAdminModal.last_name || ''} className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">Corporate Email *</label>
+                <input name="email" type="email" required defaultValue={editAdminModal.email || ''} className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">Contact Details / Phone</label>
+                <input name="contactDetails" type="tel" defaultValue={editAdminModal.contact_details || editAdminModal.phone || ''} placeholder="+63 900 000 0000" className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">Office / Residential Address</label>
+                <input name="address" type="text" defaultValue={editAdminModal.address || ''} placeholder="e.g. One Bonifacio High Street, BGC, Taguig City" className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500/50" />
+              </div>
+            </div>
+
+            <div className="mt-8 pt-4 border-t border-indigo-800/50 flex gap-3 justify-end">
+               <button type="button" onClick={() => setEditAdminModal(null)} className="px-5 py-2.5 text-sm font-bold text-indigo-300 hover:text-white transition-colors cursor-pointer">Cancel</button>
+               <button type="submit" disabled={processingId === `updating-admin-${editAdminModal.id}`} className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-8 py-2.5 rounded-xl text-sm font-bold shadow-lg hover:shadow-fuchsia-500/25 active:scale-95 transition-all disabled:opacity-50 cursor-pointer">
+                 {processingId === `updating-admin-${editAdminModal.id}` ? 'Saving...' : 'Save Changes'}
                </button>
             </div>
           </form>
@@ -2478,11 +2958,20 @@ export default function AdminDashboard() {
               {/* CONVERSATION THREAD */}
               <div className="bg-[#090b14]/50 border border-indigo-800/50 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Conversation</span>
-                  {threadLoading && <span className="text-[10px] text-indigo-400 animate-pulse">Loading...</span>}
-                  {!threadLoading && thread.length > 0 && (
-                    <span className="text-[10px] text-indigo-400/70">{thread.length} {thread.length === 1 ? "reply" : "replies"}</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Conversation</span>
+                    {threadLoading && <span className="text-[10px] text-indigo-400 animate-pulse">Loading...</span>}
+                    {!threadLoading && thread.length > 0 && (
+                      <span className="text-[10px] text-indigo-400/70">({thread.length} {thread.length === 1 ? "reply" : "replies"})</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLogReplyModal(viewInquiryModal)}
+                    className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/30 transition-all cursor-pointer"
+                  >
+                    + Log Customer Reply
+                  </button>
                 </div>
 
                 <div className="space-y-3">
@@ -2567,6 +3056,38 @@ export default function AdminDashboard() {
                <button type="submit" disabled={processingId === 'email-sending'} className="bg-blue-600 text-white px-8 py-2.5 rounded-xl text-sm font-bold shadow-lg hover:shadow-blue-500/25 active:scale-95 disabled:opacity-50">
                  {processingId === 'email-sending' ? 'Sending...' : 'Send Email'}
                </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* --- LOG CUSTOMER REPLY MODAL --- */}
+      {logReplyModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-[#090b14]/85 backdrop-blur-sm cursor-pointer" onClick={() => setLogReplyModal(null)}></div>
+          <form onSubmit={handleLogCustomerReply} className="relative w-full max-w-lg bg-gradient-to-b from-[#13172e] to-[#090b14] border border-emerald-500/50 rounded-2xl p-6 md:p-8 z-10 shadow-[0_0_40px_rgba(16,185,129,0.25)] flex flex-col">
+            <div className="flex justify-between items-start mb-6 border-b border-indigo-800/50 pb-4">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <MessageSquare className="w-6 h-6 text-emerald-400" /> Record Customer Reply
+                </h3>
+                <p className="text-xs text-indigo-300/80 mt-1">Record incoming reply from <span className="font-bold text-white">{logReplyModal.name}</span></p>
+              </div>
+              <button type="button" onClick={() => setLogReplyModal(null)} className="text-indigo-400 hover:text-white"><XCircle className="w-6 h-6"/></button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">Customer Message</label>
+                <textarea name="replyMessage" required rows="5" placeholder="Paste the customer's email reply here..." className="w-full bg-[#090b14] border border-indigo-700/80 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500/50"></textarea>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-indigo-800/50 flex gap-3 justify-end">
+              <button type="button" onClick={() => setLogReplyModal(null)} className="px-5 py-2.5 text-sm font-bold text-indigo-300 hover:text-white">Cancel</button>
+              <button type="submit" disabled={processingId === 'logging-reply'} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-600/25 active:scale-95 disabled:opacity-50">
+                {processingId === 'logging-reply' ? 'Saving...' : 'Save to Thread'}
+              </button>
             </div>
           </form>
         </div>
@@ -2712,6 +3233,99 @@ export default function AdminDashboard() {
                 className="p-2 rounded-full text-indigo-300 hover:text-white hover:bg-indigo-600/40 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
               >
                 <RotateCcw className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Maintenance Mode Alert Email Preview Modal */}
+      {maintenancePreviewModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-[#090b14]/85 backdrop-blur-md cursor-pointer" onClick={() => setMaintenancePreviewModal(false)}></div>
+          <div className="relative w-full max-w-3xl bg-[#13172e] border border-indigo-700/60 rounded-2xl p-6 md:p-8 z-10 shadow-[0_0_50px_rgba(79,70,229,0.3)] max-h-[90vh] flex flex-col">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-indigo-800/50 mb-5">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-amber-400"/> Maintenance Mode Email Alert Preview
+                </h3>
+                <p className="text-xs text-indigo-300/80 mt-1">
+                  High-fidelity customer alert dispatched automatically when Maintenance Mode is toggled.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMaintenancePreviewModal(false)}
+                className="w-8 h-8 rounded-full bg-[#090b14] border border-indigo-800/60 flex items-center justify-center text-indigo-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Tab switch between Active Alert and Systems Restored */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2 bg-[#090b14] p-1 rounded-xl border border-indigo-800/60">
+                <button
+                  type="button"
+                  onClick={() => handleOpenMaintenancePreview('active')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${maintenancePreviewTab === 'active' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm' : 'text-indigo-400 hover:text-white'}`}
+                >
+                  ⚠️ Mode Activated Alert
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenMaintenancePreview('restored')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${maintenancePreviewTab === 'restored' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 shadow-sm' : 'text-indigo-400 hover:text-white'}`}
+                >
+                  ✅ Systems Restored Notice
+                </button>
+              </div>
+
+              <button
+                type="button"
+                disabled={maintenanceTestSending}
+                onClick={handleSendTestMaintenanceEmail}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 text-indigo-200 hover:text-white transition-all disabled:opacity-50 cursor-pointer shadow-sm active:scale-95"
+              >
+                {maintenanceTestSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                {maintenanceTestSending ? 'Sending Test...' : 'Send Sample to My Email'}
+              </button>
+            </div>
+
+            {maintenanceTestNotice && (
+              <div className={`mb-3 text-[11px] font-semibold rounded-lg px-3 py-2 border ${maintenanceTestNotice.startsWith('Error') ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'}`}>
+                {maintenanceTestNotice}
+              </div>
+            )}
+
+            {/* Email Render Container */}
+            <div className="flex-1 overflow-y-auto rounded-xl border border-indigo-800/40 bg-[#050713] p-4 text-slate-200 connector-scrollbar min-h-[350px]">
+              {maintenancePreviewLoading ? (
+                <div className="h-full flex items-center justify-center gap-2 text-indigo-900 py-20 font-bold">
+                  <Loader2 className="w-5 h-5 animate-spin" /> Generating Email Preview...
+                </div>
+              ) : (
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: maintenancePreviewData[maintenancePreviewTab]?.html || ''
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="mt-4 pt-3 border-t border-indigo-800/50 flex items-center justify-between">
+              <span className="text-[11px] font-mono text-indigo-400/80 truncate max-w-[400px]">
+                Subject: <strong className="text-white">{maintenancePreviewData[maintenancePreviewTab]?.subject || 'Loading...'}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setMaintenancePreviewModal(false)}
+                className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl transition-all cursor-pointer shadow-md"
+              >
+                Done
               </button>
             </div>
           </div>
