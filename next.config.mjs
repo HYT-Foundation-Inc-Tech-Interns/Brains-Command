@@ -9,9 +9,6 @@ const nextConfig = {
     "169.254.196.155",
     "169.254.*.*",
   ],
-  experimental: {
-    agentUpgrade: "security",
-  },
 };
 
 export default nextConfig;

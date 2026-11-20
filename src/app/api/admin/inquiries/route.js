@@ -3,14 +3,24 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendMail } from '@/lib/mailer';
 import { adminReplyEmail } from '@/lib/emailTemplates';
 
-const REPLY_DOMAIN = process.env.INBOUND_REPLY_DOMAIN || 'inbound.brains.asia';
+const REPLY_DOMAIN = process.env.INBOUND_REPLY_DOMAIN;
 
 /**
- * Per-inquiry Reply-To address. When the customer hits Reply, the mail lands
- * on this alias and the inbound webhook routes it back to the same thread.
+ * Per-inquiry Reply-To address.
+ * If an inbound parse domain (e.g. inbound.brains.asia) is configured in DNS, uses reply+<id>@domain.
+ * Otherwise, falls back to the active admin SMTP inbox (with Gmail plus-addressing if available)
+ * so customer replies are reliably delivered directly to the administrator rather than bouncing.
  */
 function replyAddress(inquiryId) {
-  return `reply+${inquiryId}@${REPLY_DOMAIN}`;
+  if (REPLY_DOMAIN && REPLY_DOMAIN !== 'inbound.brains.asia') {
+    return `reply+${inquiryId}@${REPLY_DOMAIN}`;
+  }
+  const fallback = process.env.REPLY_TO_EMAIL || process.env.SMTP_USER || 'hello@brains.asia';
+  if (fallback.includes('@gmail.com')) {
+    const [local, domain] = fallback.split('@');
+    return `${local}+inquiry_${inquiryId}@${domain}`;
+  }
+  return fallback;
 }
 
 export async function GET(request) {
@@ -26,7 +36,13 @@ export async function GET(request) {
         .eq('inquiry_id', String(id))
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        // If table doesn't exist yet, return empty list instead of failing with 500
+        if (error.code === 'PGRST205') {
+          return NextResponse.json({ messages: [], unmigrated: true });
+        }
+        throw error;
+      }
       return NextResponse.json({ messages: data || [] });
     }
 
@@ -191,6 +207,48 @@ export async function POST(request) {
       }
 
       return NextResponse.json({ success: true, status: 'Contacted', warning });
+    }
+
+    // Admin records a customer reply into the conversation thread
+    if (action === 'log_inbound' || action === 'record_inbound') {
+      const { inquiryId, message, senderEmail } = body;
+      if (!inquiryId || !message?.trim()) {
+        return NextResponse.json({ error: 'inquiryId and message are required' }, { status: 400 });
+      }
+
+      const { data: inquiry, error: lookupError } = await supabaseAdmin
+        .from('inquiries')
+        .select('*')
+        .eq('id', inquiryId)
+        .single();
+
+      if (lookupError || !inquiry) {
+        return NextResponse.json({ error: 'Inquiry not found' }, { status: 404 });
+      }
+
+      const { data: inserted, error: insertError } = await supabaseAdmin
+        .from('inquiry_messages')
+        .insert([{
+          inquiry_id: String(inquiry.id),
+          direction: 'inbound',
+          subject: `Re: ${inquiry.subject}`,
+          body: message.trim(),
+          from_email: senderEmail || inquiry.email,
+          to_email: process.env.SMTP_USER || 'hello@brains.asia',
+        }])
+        .select()
+        .single();
+
+      if (insertError) {
+        if (insertError.code === 'PGRST205') {
+          return NextResponse.json({
+            error: 'Database table inquiry_messages is missing. Please run supabase-inquiry-threads.sql in your Supabase SQL Editor.',
+          }, { status: 400 });
+        }
+        throw insertError;
+      }
+
+      return NextResponse.json({ success: true, message: inserted });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

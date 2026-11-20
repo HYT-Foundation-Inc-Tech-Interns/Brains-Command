@@ -23,20 +23,24 @@ export function getTransporter() {
 }
 
 export const MAIL_FROM =
-  process.env.SMTP_FROM || '"Brains Central Command" <hello@brains.asia>';
+  process.env.SMTP_FROM ||
+  (process.env.SMTP_USER ? `"Brains Central Command" <${process.env.SMTP_USER}>` : '"Brains Central Command" <hello@brains.asia>');
 
-export async function sendMail({ to, subject, html, text, replyTo, attachments }) {
+export async function sendMail({ to, subject, html, text, replyTo, attachments, headers }) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     throw new Error('SMTP credentials are not configured (SMTP_USER / SMTP_PASS).');
   }
 
+  const defaultReplyTo = process.env.REPLY_TO_EMAIL || process.env.SMTP_USER || 'hello@brains.asia';
+
   return getTransporter().sendMail({
     from: MAIL_FROM,
     to,
-    replyTo: replyTo || 'replies@inbound.brains.asia',
+    replyTo: replyTo || defaultReplyTo,
     subject,
     html,
     text,
+    ...(headers ? { headers } : {}),
     ...(attachments?.length ? { attachments } : {}),
   });
 }

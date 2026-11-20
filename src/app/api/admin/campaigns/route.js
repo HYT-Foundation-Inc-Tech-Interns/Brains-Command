@@ -100,7 +100,8 @@ async function prepareCampaign(payload, profile) {
 
   const imageUrls = (Array.isArray(payload.imageUrls) ? payload.imageUrls : [])
     .filter((url) => typeof url === 'string' && /^https?:\/\//i.test(url))
-    .slice(0, 6);
+    .slice(0, 6)
+    .map(normalizeCampaignImageUrl);
 
   const { customers, prospects } = await resolveAudience();
   const everyone = [...customers, ...prospects];
@@ -164,6 +165,67 @@ async function prepareCampaign(payload, profile) {
   return NextResponse.json({ campaignId: campaign.id, total: pool.length });
 }
 
+/**
+ * Normalizes campaign image URLs to public, highly accessible HTTPS storage URLs.
+ * If an image was saved with an internal proxy path, restores the direct Supabase Storage public URL.
+ */
+function normalizeCampaignImageUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  if (url.includes('/api/public/campaign-assets/')) {
+    const rel = url.split('/api/public/campaign-assets/')[1].split('?')[0];
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://jomuqhnqwimnuwikvaig.supabase.co';
+    return `${supabaseUrl}/storage/v1/object/public/email-assets/${rel}`;
+  }
+  return url;
+}
+
+/**
+ * Pre-fetches images once per batch and prepares inline CID attachments.
+ * Inline attachments embed directly in the email MIME payload so email clients
+ * (including Gmail) render them without hitting external proxies or blocking issues.
+ */
+async function prepareCampaignImageAttachments(imageUrls) {
+  if (!Array.isArray(imageUrls) || !imageUrls.length) return { attachments: [], galleryImages: [] };
+
+  const attachments = [];
+  const galleryImages = [];
+
+  for (let i = 0; i < imageUrls.length; i++) {
+    const rawUrl = imageUrls[i];
+    if (!rawUrl || typeof rawUrl !== 'string') continue;
+
+    const cid = `campaign_img_${i}`;
+    let loaded = false;
+
+    try {
+      const res = await fetch(rawUrl, { signal: AbortSignal.timeout(8000) });
+      if (res.ok) {
+        const arrayBuffer = await res.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const contentType = res.headers.get('content-type') || 'image/jpeg';
+        const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+
+        attachments.push({
+          filename: `campaign-${i + 1}.${ext}`,
+          content: buffer,
+          contentType,
+          cid,
+        });
+        galleryImages.push({ cid, url: rawUrl });
+        loaded = true;
+      }
+    } catch (e) {
+      console.warn('Could not prefetch image for inline CID attachment:', rawUrl, e.message);
+    }
+
+    if (!loaded) {
+      galleryImages.push({ url: rawUrl });
+    }
+  }
+
+  return { attachments, galleryImages };
+}
+
 /** Sends the next slice of pending recipients for one campaign. */
 async function sendBatch(payload) {
   const campaignId = String(payload.campaignId || '');
@@ -197,19 +259,25 @@ async function sendBatch(payload) {
 
   if (queueError) throw queueError;
 
+  const imageUrls = (campaign.image_urls || []).map(normalizeCampaignImageUrl);
+  const { attachments, galleryImages } = await prepareCampaignImageAttachments(imageUrls);
+
   const results = [];
 
   await runLimited(queue || [], SEND_CONCURRENCY, async (row) => {
     try {
+      const emailContent = campaignEmail({
+        subject: campaign.subject,
+        body: campaign.body,
+        images: galleryImages,
+        recipientName: row.name,
+        unsubscribeUrl: unsubscribeUrl(row.email),
+      });
+
       await sendMail({
         to: row.email,
-        ...campaignEmail({
-          subject: campaign.subject,
-          body: campaign.body,
-          images: campaign.image_urls || [],
-          recipientName: row.name,
-          unsubscribeUrl: unsubscribeUrl(row.email),
-        }),
+        ...emailContent,
+        ...(attachments.length ? { attachments } : {}),
       });
       results.push({ id: row.id, status: 'sent' });
     } catch (err) {
@@ -287,16 +355,21 @@ async function sendTest(payload) {
   }
 
   const subject = `[TEST] ${String(payload.subject || 'Campaign preview').trim()}`;
+  const imageUrls = (Array.isArray(payload.imageUrls) ? payload.imageUrls : []).map(normalizeCampaignImageUrl);
+  const { attachments, galleryImages } = await prepareCampaignImageAttachments(imageUrls);
+
+  const emailContent = campaignEmail({
+    subject,
+    body: payload.body,
+    images: galleryImages,
+    recipientName: admin.first_name,
+    unsubscribeUrl: unsubscribeUrl(to),
+  });
 
   await sendMail({
     to,
-    ...campaignEmail({
-      subject,
-      body: payload.body,
-      images: (Array.isArray(payload.imageUrls) ? payload.imageUrls : []).slice(0, 6),
-      recipientName: admin.first_name,
-      unsubscribeUrl: unsubscribeUrl(to),
-    }),
+    ...emailContent,
+    ...(attachments.length ? { attachments } : {}),
   });
 
   return NextResponse.json({ success: true, to });
