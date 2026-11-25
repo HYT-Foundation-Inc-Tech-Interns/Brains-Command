@@ -1411,17 +1411,24 @@ export default function CentralCommand() {
                 <span>Central Command OS // Neural Ecosystem</span>
               </div>
 
-              <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight mb-6 text-white leading-[1.08]">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-500 via-indigo-300 to-blue-400">Brains Infinite Innovations</span><br />
-                <ScrollLetters text="Progressive Technology for a Better World." as="span" className="text-white block mt-1" glow />
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black tracking-tight mb-6 text-white leading-[1.12]">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-500 via-indigo-300 to-blue-400 block pb-1">
+                  Brains Infinite Innovations
+                </span>
+                <ScrollLetters text="Progressive Technology for a Better World." as="span" className="text-white block mt-2" glow />
               </h1>
             </FadeIn>
 
             <FadeIn delay={180}>
-              <p className="text-base sm:text-lg text-indigo-200/90 max-w-2xl mb-8 leading-relaxed">
+              <p className="text-base sm:text-lg text-indigo-200/90 max-w-2xl mb-4 leading-relaxed">
                 Unifying property operations, software systems, bespoke agency services, and B2B marketplaces into one central command layer.
-                <span className="font-semibold text-fuchsia-400 mt-2 block tracking-wider uppercase text-sm">"We got what you think!"</span>
               </p>
+
+              <div className="mb-8">
+                <p className="text-xl sm:text-2xl lg:text-3xl font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 via-pink-300 to-indigo-300 drop-shadow-[0_0_20px_rgba(217,70,239,0.35)]">
+                  "WE GOT WHAT YOU THINK!"
+                </p>
+              </div>
             </FadeIn>
             
             <FadeIn delay={240}>

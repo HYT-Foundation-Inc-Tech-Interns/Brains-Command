@@ -60,7 +60,7 @@ export default function ScrollLetters({
   return (
     <Component
       ref={containerRef}
-      className={`inline-block ${className}`}
+      className={`${className.includes('block') ? '' : 'inline-block'} ${className}`}
       style={{ perspective: '800px' }}
     >
       {words.map((word, wIdx) => {
@@ -69,7 +69,7 @@ export default function ScrollLetters({
           <span
             key={wIdx}
             className="inline-block whitespace-nowrap mr-[0.25em] last:mr-0"
-            style={{ overflow: 'hidden', verticalAlign: 'baseline' }}
+            style={{ overflow: 'visible', verticalAlign: 'baseline' }}
           >
             {letters.map((char, cIdx) => {
               const delay = charCounter * stagger + wIdx * wordDelay;
@@ -83,10 +83,10 @@ export default function ScrollLetters({
                     display: 'inline-block',
                     transform: isVisible || !hasMounted
                       ? 'translate3d(0, 0, 0) rotateX(0deg) scale(1)'
-                      : 'translate3d(0, 110%, 0) rotateX(-50deg) scale(0.94)',
+                      : 'translate3d(0, 30%, 0) rotateX(-25deg) scale(0.96)',
                     opacity: isVisible || !hasMounted ? 1 : 0,
                     filter: isVisible || !hasMounted
-                      ? (glow ? 'drop-shadow(0 0 10px rgba(217,70,239,0.3)) blur(0px)' : 'blur(0px)')
+                      ? (glow ? 'drop-shadow(0 0 12px rgba(217,70,239,0.35)) blur(0px)' : 'blur(0px)')
                       : 'blur(5px)',
                     transitionDuration: '700ms',
                     transitionDelay: `${delay}ms`,
